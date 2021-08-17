@@ -51,6 +51,14 @@ flags.DEFINE_float('reward_bonus', 5.0, 'CQL style reward bonus.')
 
 def main(_):
     tf.config.experimental_run_functions_eagerly(FLAGS.eager)
+    # limit gpu memory growth
+    gpus = tf.config.list_physical_devices('GPU')
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except:
+        # Invalid device or cannot modify virtual devices once initialized.
+        RuntimeError("Tensorflow setting gpu memory growth error!")
 
     gym_env, dataset = d4rl_utils.create_d4rl_env_and_dataset(
         task_name=FLAGS.task_name, batch_size=FLAGS.batch_size)

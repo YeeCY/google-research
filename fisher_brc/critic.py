@@ -102,13 +102,13 @@ class Critic(tf.keras.Model):
              actions):
         """Returns Q-value estimates for given states and actions.
 
-    Args:
-      states: A batch of states.
-      actions: A batch of actions.
+        Args:
+          states: A batch of states.
+          actions: A batch of actions.
 
-    Returns:
-      Two estimates of Q-values.
-    """
+        Returns:
+          Two estimates of Q-values.
+        """
         q1 = self.critic1(states, actions)
         q2 = self.critic2(states, actions)
 

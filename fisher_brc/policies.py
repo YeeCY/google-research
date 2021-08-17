@@ -43,13 +43,13 @@ class BasePolicy(tf.keras.Model):
                  eps=1e-6):
         """Creates an actor.
 
-    Args:
-      state_dim: State size.
-      action_dim: Actiom size.
-      action_spec: Action spec.
-      hidden_dims: List of hidden dimensions.
-      eps: Epsilon for numerical stability.
-    """
+        Args:
+          state_dim: State size.
+          action_dim: Actiom size.
+          action_spec: Action spec.
+          hidden_dims: List of hidden dimensions.
+          eps: Epsilon for numerical stability.
+        """
         super().__init__()
 
         relu_gain = tf.math.sqrt(2.0)
@@ -101,10 +101,10 @@ class MixtureGuassianPolicy(BasePolicy):
             stddev=1.0):
         """Returns a tf.Distribution for given states modes of this distribution.
 
-    Args:
-      states: Batch of states.
-      stddev: Standard deviation of sampling distribution.
-    """
+        Args:
+          states: Batch of states.
+          stddev: Standard deviation of sampling distribution.
+        """
         out = self.trunk(states)
         logits, mu, log_std = tf.split(out, num_or_size_splits=3, axis=1)
 
@@ -196,10 +196,10 @@ class DiagGuassianPolicy(BasePolicy):
             stddev=1.0):
         """Returns a tf.Distribution for given states modes of this distribution.
 
-    Args:
-      states: Batch of states.
-      stddev: Standard deviation of sampling distribution.
-    """
+        Args:
+          states: Batch of states.
+          stddev: Standard deviation of sampling distribution.
+        """
         out = self.trunk(states)
         mu, log_std = tf.split(out, num_or_size_splits=2, axis=1)
 

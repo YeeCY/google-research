@@ -61,12 +61,12 @@ class BehavioralCloning(object):
     def update_step(self, dataset_iter):
         """Performs a single training step.
 
-    Args:
-      dataset_iter: Iterator over dataset samples.
+        Args:
+          dataset_iter: Iterator over dataset samples.
 
-    Returns:
-      Dictionary with losses to track.
-    """
+        Returns:
+          Dictionary with losses to track.
+        """
         states, actions, _, _, _ = next(dataset_iter)
 
         with tf.GradientTape(watch_accessed_variables=False) as tape:
