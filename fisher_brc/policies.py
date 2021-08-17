@@ -225,14 +225,14 @@ class DiagGuassianPolicy(BasePolicy):
     ):
         """Computes actions for given inputs.
 
-    Args:
-      states: Batch of states.
-      sample: Whether to sample actions.
-      with_log_probs: Whether to return log probability of sampled actions.
+        Args:
+          states: Batch of states.
+          sample: Whether to sample actions.
+          with_log_probs: Whether to return log probability of sampled actions.
 
-    Returns:
-      Sampled actions.
-    """
+        Returns:
+          Sampled actions.
+        """
         if sample:
             dist = self._get_dist_and_mode(states)
         else:

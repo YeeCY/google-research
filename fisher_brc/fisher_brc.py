@@ -45,18 +45,18 @@ class FBRC(object):
                  reward_bonus=5.0):
         """Creates networks.
 
-    Args:
-      observation_spec: environment observation spec.
-      action_spec: Action spec.
-      actor_lr: Actor learning rate.
-      critic_lr: Critic learning rate.
-      alpha_lr: Temperature learning rate.
-      discount: MDP discount.
-      tau: Soft target update parameter.
-      target_entropy: Target entropy.
-      f_reg: Critic regularization weight.
-      reward_bonus: Bonus added to the rewards.
-    """
+        Args:
+          observation_spec: environment observation spec.
+          action_spec: Action spec.
+          actor_lr: Actor learning rate.
+          critic_lr: Critic learning rate.
+          alpha_lr: Temperature learning rate.
+          discount: MDP discount.
+          tau: Soft target update parameter.
+          target_entropy: Target entropy.
+          f_reg: Critic regularization weight.
+          reward_bonus: Bonus added to the rewards.
+        """
         assert len(observation_spec.shape) == 1
         state_dim = observation_spec.shape[0]
 
@@ -91,26 +91,26 @@ class FBRC(object):
         else:
             q1, q2 = self.critic(states, actions)
         log_probs = self.bc.policy.log_probs(states, actions)
-        if stop_gradient:
+        if stop_gradient:  # (cyzheng): only stop gradients from behavior policy to actor
             log_probs = tf.stop_gradient(log_probs)
-        return (q1 + log_probs, q2 + log_probs)
+        return q1 + log_probs, q2 + log_probs
 
     def fit_critic(self, states, actions,
                    next_states, rewards,
                    discounts):
         """Updates critic parameters.
 
-    Args:
-      states: Batch of states.
-      actions: Batch of actions.
-      next_states: Batch of next states.
-      rewards: Batch of rewards.
-      discounts: Batch of masks indicating the end of the episodes.
+        Args:
+          states: Batch of states.
+          actions: Batch of actions.
+          next_states: Batch of next states.
+          rewards: Batch of rewards.
+          discounts: Batch of masks indicating the end of the episodes.
 
-    Returns:
-      Dictionary with information to track.
-    """
-        next_actions = self.actor(next_states, sample=True)
+        Returns:
+          Dictionary with information to track.
+        """
+        next_actions = self.actor(next_states, sample=True)  # (cyzheng): sample from mixture of diagonal Gaussians
         policy_actions = self.actor(states, sample=True)
 
         next_target_q1, next_target_q2 = self.dist_critic(
@@ -122,7 +122,7 @@ class FBRC(object):
 
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(critic_variables)
-            q1, q2 = self.dist_critic(states, actions, stop_gradient=True)
+            q1, q2 = self.dist_critic(states, actions, stop_gradient=True)  # (cyzheng): only stop gradients from behavior policy to actor, but why?
             with tf.GradientTape(
                     watch_accessed_variables=False, persistent=True) as tape2:
                 tape2.watch([policy_actions])
@@ -163,12 +163,12 @@ class FBRC(object):
     def fit_actor(self, states):
         """Updates critic parameters.
 
-    Args:
-      states: A batch of states.
+        Args:
+          states: A batch of states.
 
-    Returns:
-      Actor loss.
-    """
+        Returns:
+          Actor loss.
+        """
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(self.actor.trainable_variables)
             actions, log_probs = self.actor(states, sample=True, with_log_probs=True)
@@ -198,15 +198,15 @@ class FBRC(object):
     def update_step(self, replay_buffer_iter):
         """Performs a single training step for critic and actor.
 
-    Args:
-      replay_buffer_iter: An tensorflow graph iteratable object.
+        Args:
+          replay_buffer_iter: An tensorflow graph iteratable object.
 
-    Returns:
-      Dictionary with losses to track.
-    """
+        Returns:
+          Dictionary with losses to track.
+        """
 
         states, actions, rewards, discounts, next_states = next(replay_buffer_iter)
-        rewards = rewards + self.reward_bonus
+        rewards = rewards + self.reward_bonus  # TODO (cyzheng): why we add a reward bonus here?
 
         critic_dict = self.fit_critic(states, actions, next_states, rewards,
                                       discounts)

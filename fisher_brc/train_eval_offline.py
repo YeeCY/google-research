@@ -51,7 +51,7 @@ flags.DEFINE_float('reward_bonus', 5.0, 'CQL style reward bonus.')
 
 def main(_):
     tf.config.experimental_run_functions_eagerly(FLAGS.eager)
-    # limit gpu memory growth
+    # (cyzheng): limit gpu memory growth
     gpus = tf.config.list_physical_devices('GPU')
     try:
         for gpu in gpus:
@@ -109,7 +109,7 @@ def main(_):
 
         if (i + 1) % FLAGS.eval_interval == 0:
             average_returns, average_length = evaluation.evaluate(env, model)
-            average_returns = gym_env.get_normalized_score(average_returns) * 100.0
+            average_returns = gym_env.get_normalized_score(average_returns) * 100.0  # (cyzheng): normalize by oracle returns
 
             with result_writer.as_default():
                 tf.summary.scalar('evaluation/returns', average_returns, step=i + 1)
