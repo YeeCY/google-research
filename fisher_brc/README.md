@@ -18,7 +18,7 @@ If you use this code for your research, please consider citing the paper:
 Install Dependencies
 --------------------
 ```bash
-pip install -m requirements.txt
+pip install -r requirements.txt
 ```
 
 You will also need to install Mujoco and use a valid license. Follow the install

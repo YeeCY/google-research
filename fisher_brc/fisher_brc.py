@@ -21,9 +21,12 @@ import tensorflow as tf
 from tf_agents.specs.tensor_spec import BoundedTensorSpec
 from tf_agents.specs.tensor_spec import TensorSpec
 
-from fisher_brc import behavioral_cloning
-from fisher_brc import critic
-from fisher_brc import policies
+# from fisher_brc import behavioral_cloning
+# from fisher_brc import critic
+# from fisher_brc import policies
+import behavioral_cloning
+import critic
+import policies
 
 
 class FBRC(object):

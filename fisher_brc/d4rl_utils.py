@@ -23,10 +23,10 @@ import tensorflow as tf
 
 
 def create_d4rl_env_and_dataset(
-    task_name,
-    batch_size
+        task_name,
+        batch_size
 ):
-  """Create gym environment and dataset for d4rl.
+    """Create gym environment and dataset for d4rl.
 
   Args:
     task_name: Name of d4rl task.
@@ -34,18 +34,18 @@ def create_d4rl_env_and_dataset(
   Returns:
     Gym env and dataset.
   """
-  env = gym.make(task_name)
-  dataset = d4rl.qlearning_dataset(env)
+    env = gym.make(task_name)
+    dataset = d4rl.qlearning_dataset(env)
 
-  states = np.array(dataset['observations'], dtype=np.float32)
-  actions = np.array(dataset['actions'], dtype=np.float32)
-  rewards = np.array(dataset['rewards'], dtype=np.float32)
-  discounts = np.array(np.logical_not(dataset['terminals']), dtype=np.float32)
-  next_states = np.array(dataset['next_observations'], dtype=np.float32)
+    states = np.array(dataset['observations'], dtype=np.float32)
+    actions = np.array(dataset['actions'], dtype=np.float32)
+    rewards = np.array(dataset['rewards'], dtype=np.float32)
+    discounts = np.array(np.logical_not(dataset['terminals']), dtype=np.float32)
+    next_states = np.array(dataset['next_observations'], dtype=np.float32)
 
-  dataset = tf.data.Dataset.from_tensor_slices(
-      (states, actions, rewards, discounts, next_states)).cache().shuffle(
-          states.shape[0], reshuffle_each_iteration=True).repeat().batch(
-              batch_size,
-              drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE)
-  return env, dataset
+    dataset = tf.data.Dataset.from_tensor_slices(
+        (states, actions, rewards, discounts, next_states)).cache().shuffle(
+        states.shape[0], reshuffle_each_iteration=True).repeat().batch(
+        batch_size,
+        drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE)
+    return env, dataset
