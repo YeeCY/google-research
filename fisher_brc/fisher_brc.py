@@ -110,7 +110,7 @@ class FBRC(object):
         Returns:
           Dictionary with information to track.
         """
-        next_actions = self.actor(next_states, sample=True)  # (cyzheng): sample from mixture of diagonal Gaussians
+        next_actions = self.actor(next_states, sample=True)
         policy_actions = self.actor(states, sample=True)
 
         next_target_q1, next_target_q2 = self.dist_critic(
