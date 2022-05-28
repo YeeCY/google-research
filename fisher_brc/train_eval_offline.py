@@ -23,10 +23,14 @@ from tf_agents.environments import gym_wrapper
 from tf_agents.environments import tf_py_environment
 import tqdm
 
-from fisher_brc import behavioral_cloning
-from fisher_brc import d4rl_utils
-from fisher_brc import evaluation
-from fisher_brc import fisher_brc
+# from fisher_brc import behavioral_cloning
+# from fisher_brc import d4rl_utils
+# from fisher_brc import evaluation
+# from fisher_brc import fisher_brc
+import behavioral_cloning
+import d4rl_utils
+import evaluation
+import fisher_brc
 
 FLAGS = flags.FLAGS
 
@@ -39,69 +43,78 @@ flags.DEFINE_integer('bc_pretraining_steps', 1_000_000, 'Num updates.')
 flags.DEFINE_integer('num_eval_episodes', 10, 'Num eval episodes.')
 flags.DEFINE_integer('log_interval', 1000, 'Logging interval.')
 flags.DEFINE_integer('eval_interval', 10_000, 'Evaluation interval.')
-flags.DEFINE_string('save_dir', '/tmp/save/', 'Saving directory.')
+flags.DEFINE_string('save_dir', './logs', 'Saving directory.')
 flags.DEFINE_boolean('eager', False, 'Execute functions eagerly.')
 flags.DEFINE_float('f_reg', 0.1, 'Fisher regularization.')
 flags.DEFINE_float('reward_bonus', 5.0, 'CQL style reward bonus.')
 
 
 def main(_):
-  tf.config.experimental_run_functions_eagerly(FLAGS.eager)
+    tf.config.experimental_run_functions_eagerly(FLAGS.eager)
+    # (cyzheng): limit gpu memory growth
+    gpus = tf.config.list_physical_devices('GPU')
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except:
+        # Invalid device or cannot modify virtual devices once initialized.
+        RuntimeError("Tensorflow setting gpu memory growth error!")
 
-  gym_env, dataset = d4rl_utils.create_d4rl_env_and_dataset(
-      task_name=FLAGS.task_name, batch_size=FLAGS.batch_size)
+    gym_env, dataset = d4rl_utils.create_d4rl_env_and_dataset(
+        task_name=FLAGS.task_name, batch_size=FLAGS.batch_size)
 
-  env = gym_wrapper.GymWrapper(gym_env)
-  env = tf_py_environment.TFPyEnvironment(env)
+    env = gym_wrapper.GymWrapper(gym_env)
+    env = tf_py_environment.TFPyEnvironment(env)
 
-  dataset_iter = iter(dataset)
+    dataset_iter = iter(dataset)
 
-  tf.random.set_seed(FLAGS.seed)
+    tf.random.set_seed(FLAGS.seed)
 
-  hparam_str = f'{FLAGS.algo_name}_{FLAGS.task_name}_seed={FLAGS.seed}'
+    hparam_str = f'{FLAGS.algo_name}_{FLAGS.task_name}_seed={FLAGS.seed}'
 
-  summary_writer = tf.summary.create_file_writer(
-      os.path.join(FLAGS.save_dir, 'tb', hparam_str))
-  result_writer = tf.summary.create_file_writer(
-      os.path.join(FLAGS.save_dir, 'results', hparam_str))
+    summary_writer = tf.summary.create_file_writer(
+        os.path.join(FLAGS.save_dir, 'tb', hparam_str))
+    result_writer = tf.summary.create_file_writer(
+        os.path.join(FLAGS.save_dir, 'results', hparam_str))
 
-  if FLAGS.algo_name == 'bc':
-    model = behavioral_cloning.BehavioralCloning(
-        env.observation_spec(),
-        env.action_spec())
-  else:
-    model = fisher_brc.FBRC(
-        env.observation_spec(),
-        env.action_spec(),
-        target_entropy=-env.action_spec().shape[0],
-        f_reg=FLAGS.f_reg,
-        reward_bonus=FLAGS.reward_bonus)
+    if FLAGS.algo_name == 'bc':
+        model = behavioral_cloning.BehavioralCloning(
+            env.observation_spec(),
+            env.action_spec())
+    else:
+        model = fisher_brc.FBRC(
+            env.observation_spec(),
+            env.action_spec(),
+            target_entropy=-env.action_spec().shape[0],
+            f_reg=FLAGS.f_reg,
+            reward_bonus=FLAGS.reward_bonus)
 
-    for i in tqdm.tqdm(range(FLAGS.bc_pretraining_steps)):
-      info_dict = model.bc.update_step(dataset_iter)
+        for i in tqdm.tqdm(range(FLAGS.bc_pretraining_steps)):
+            info_dict = model.bc.update_step(dataset_iter)
 
-      if i % FLAGS.log_interval == 0:
+            if i % FLAGS.log_interval == 0:
+                with summary_writer.as_default():
+                    for k, v in info_dict.items():
+                        tf.summary.scalar(
+                            f'training/{k}', v, step=i - FLAGS.bc_pretraining_steps)
+
+    for i in tqdm.tqdm(range(FLAGS.num_updates)):
         with summary_writer.as_default():
-          for k, v in info_dict.items():
-            tf.summary.scalar(
-                f'training/{k}', v, step=i - FLAGS.bc_pretraining_steps)
+            info_dict = model.update_step(dataset_iter)
 
-  for i in tqdm.tqdm(range(FLAGS.num_updates)):
-    with summary_writer.as_default():
-      info_dict = model.update_step(dataset_iter)
+        if i % FLAGS.log_interval == 0:
+            with summary_writer.as_default():
+                for k, v in info_dict.items():
+                    tf.summary.scalar(f'training/{k}', v, step=i)
 
-    if i % FLAGS.log_interval == 0:
-      with summary_writer.as_default():
-        for k, v in info_dict.items():
-          tf.summary.scalar(f'training/{k}', v, step=i)
+        if (i + 1) % FLAGS.eval_interval == 0:
+            average_returns, average_length = evaluation.evaluate(env, model)
+            average_returns = gym_env.get_normalized_score(average_returns) * 100.0  # (cyzheng): normalize by oracle returns
 
-    if (i + 1) % FLAGS.eval_interval == 0:
-      average_returns, average_length = evaluation.evaluate(env, model)
-      average_returns = gym_env.get_normalized_score(average_returns) * 100.0
+            with result_writer.as_default():
+                tf.summary.scalar('evaluation/returns', average_returns, step=i + 1)
+                tf.summary.scalar('evaluation/length', average_length, step=i + 1)
 
-      with result_writer.as_default():
-        tf.summary.scalar('evaluation/returns', average_returns, step=i+1)
-        tf.summary.scalar('evaluation/length', average_length, step=i+1)
 
 if __name__ == '__main__':
-  app.run(main)
+    app.run(main)

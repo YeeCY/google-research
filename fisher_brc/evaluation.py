@@ -17,8 +17,8 @@
 from typing import Tuple
 
 
-def evaluate(env, policy, num_episodes = 10):
-  """Evaluates the policy.
+def evaluate(env, policy, num_episodes=10):
+    """Evaluates the policy.
 
   Args:
     env: Environment to evaluate the policy on.
@@ -28,19 +28,19 @@ def evaluate(env, policy, num_episodes = 10):
   Returns:
     Averaged reward and a total number of steps.
   """
-  total_timesteps = 0
-  total_returns = 0.0
+    total_timesteps = 0
+    total_returns = 0.0
 
-  for _ in range(num_episodes):
-    episode_return = 0
-    timestep = env.reset()
+    for _ in range(num_episodes):
+        episode_return = 0
+        timestep = env.reset()
 
-    while not timestep.is_last():
-      action = policy.act(timestep.observation)
-      timestep = env.step(action)
+        while not timestep.is_last():
+            action = policy.act(timestep.observation)
+            timestep = env.step(action)
 
-      total_returns += timestep.reward[0]
-      episode_return += timestep.reward[0]
-      total_timesteps += 1
+            total_returns += timestep.reward[0]
+            episode_return += timestep.reward[0]
+            total_timesteps += 1
 
-  return total_returns / num_episodes, total_timesteps / num_episodes
+    return total_returns / num_episodes, total_timesteps / num_episodes

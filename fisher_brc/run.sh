@@ -24,6 +24,6 @@ pip install -r fisher_brc/requirements.txt
 python -m fisher_brc.train_eval_offline \
   --task_name hopper-medium-expert-v0 \
   --num_updates 100 \
-  --bc_pretraining_steps 100\
+  --bc_pretraining_steps 100 \
   --seed 42 \
   --alsologtostderr
