@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,6 @@ Examples:
 # pylint: disable=missing-docstring
 from __future__ import absolute_import
 from __future__ import division
-
 from __future__ import print_function
 
 from lingvo.core import py_utils
@@ -58,6 +57,8 @@ from model_pruning.python import pruning
 
 
 UPDATE_OP_COLLECTION = 'update_op'
+CompressionOptions = compression_wrapper.CompressionOptions
+UpdateOptions = compression_wrapper.UpdateOptions
 
 
 def get_matrix_compression_object(hparams,  # pylint:disable=invalid-name
@@ -182,9 +183,10 @@ def apply_customized_matrix_compression(matrix_compression_obj,  # pylint:disabl
         tf.add_to_collection(pruning.OLD_OLD_WEIGHT_COLLECTION,
                              layer_obj.vars.old_old_weight)
   else:
-    _ = matrix_compression_obj.customized_apply_compression(
-        getattr(layer_obj.vars, weight_name), layer_obj, weight_params_fn,
-        weight_init_obj, scope=scope_name, spec=spec)
+    matrix_compression_obj.customized_apply_compression(
+        getattr(layer_obj.vars, weight_name, None), layer_obj, weight_params_fn,
+        weight_init_obj, scope=scope_name, spec=spec,
+        a_matrix_tfvar_shape=weight_shape)
     hparams = matrix_compression_obj.get_spec()
     if hparams.use_collection:
       tf.add_to_collection(UPDATE_OP_COLLECTION,
@@ -279,12 +281,14 @@ def get_matrix_compression_update_op(matrix_compression_obj):  # pylint:disable=
   if hparams.prune_option in [
       'weight', 'first_order_gradient', 'second_order_gradient']:
     return matrix_compression_obj.conditional_mask_update_op()
-  elif hparams.update_option == 0 or hparams.update_option == 2:
-    # 'update_option' == 0 means matrix compression, for which we can
-    # return an update op here. 'update_option' == 1 means dictionary learning,
-    # for which we cannot return an update op here, and need to explicitly call
-    # run_update_step(), see graph_compression/compression_lib/compression_op.py
-    # for more details.
+  elif (hparams.update_option == UpdateOptions.TF_UPDATE or
+        hparams.update_option
+        == UpdateOptions.TF_AND_PYTHON_UPDATE):
+    # 'update_option' == TF_UPDATE means matrix compression, for which we can
+    # return an update op here. 'update_option' == PYTHON_UPDATE means
+    # dictionary learning, for which we cannot return an update op here, and
+    # need to explicitly call run_update_step(),
+    # see graph_compression/compression_lib/compression_op.py for more details.
     if hparams.use_collection:
       # If use_collection is True, then update_ops are retrieved from
       # UPDATE_OP_COLLECTION, to ensure the same behavior as pruning.
@@ -302,7 +306,7 @@ def run_update_step(matrix_compression_obj, session, step_number=None):  # pylin
   hparams = matrix_compression_obj.get_spec()
   if (hparams.prune_option in [
       'weight', 'first_order_gradient', 'second_order_gradient'] or
-      hparams.update_option == 0):
+      hparams.update_option == UpdateOptions.TF_UPDATE):
     update_op = get_matrix_compression_update_op(matrix_compression_obj)
     session.run(update_op)
   else:
@@ -432,7 +436,7 @@ class PruningOp(object):
   def GetMatmulResult(cls,
                       a,
                       b,
-                      softmaxlayerobj,
+                      softmax_layer_obj,
                       transpose_a=False,
                       transpose_b=False):  # pylint:disable=invalid-name
     """Compute the compressed result of matmul(a,b).
@@ -440,7 +444,7 @@ class PruningOp(object):
     Args:
       a: a tensor of rank 2;
       b: a tensor of rank 2;
-      softmaxlayerobj: a SimpleFullSoftmax layer object;
+      softmax_layer_obj: a SimpleFullSoftmax layer object;
       transpose_a: whether to transpose a before matmul;
       transpose_b: whether to transpose b before matmul.
 
@@ -454,8 +458,8 @@ class PruningOp(object):
     """
     if cls._pruning_obj:
       # current implementation works for num_shards = 1 in SimpleFullSoftmax.
-      return softmaxlayerobj.compression_ops[-1].get_matmul_operator(
-          a, b, transpose_a, transpose_b)
+      return softmax_layer_obj.compression_ops[-1].get_matmul_operator(
+          a, b, softmax_layer_obj, transpose_a, transpose_b)
     else:
       raise NotImplementedError()
 
@@ -516,7 +520,12 @@ class PruningOp(object):
         outputs = cls.GetEinSumResult(inputs, proj_obj)
     else:
       if p.pruning_hparams_dict[
-          'compression_option'] == 9 and p.pruning_hparams_dict[
+          'compression_option'] == CompressionOptions.MIXED_BLOCK_COMPRESSION:
+        # can directly call GetEinSumResult as it doesn't use einsum operator
+        # for this compression option.
+        outputs = cls.GetEinSumResult(inputs, proj_obj)
+      elif p.pruning_hparams_dict[
+          'compression_option'] == CompressionOptions.INPUTOUTPUT_COMPRESSION and p.pruning_hparams_dict[
               'compress_input']:
         blocked_inputs = tf.reshape(
             inputs,
@@ -532,7 +541,8 @@ class PruningOp(object):
         compressed_inputs = tf.reshape(inputs,
                                        py_utils.ToStaticShape([-1, input_dim]))
 
-      if p.pruning_hparams_dict['compression_option'] == 10:
+      if p.pruning_hparams_dict[
+          'compression_option'] == CompressionOptions.BLOCK_COMPRESSION:
         if p.pruning_hparams_dict['block_method'] == 'mask':
           intermediate_result = py_utils.Matmul(
               compressed_inputs,
@@ -550,7 +560,7 @@ class PruningOp(object):
                                               theta.c_matrix_tfvar)
 
       if p.pruning_hparams_dict[
-          'compression_option'] == 9 and p.pruning_hparams_dict[
+          'compression_option'] == CompressionOptions.INPUTOUTPUT_COMPRESSION and p.pruning_hparams_dict[
               'compress_output']:
         blocked_intermediate_result = tf.reshape(
             intermediate_result,
@@ -616,14 +626,19 @@ class PruningOp(object):
     hparams = cls._pruning_obj.get_spec()
     return (hparams.prune_option in [
         'weight', 'first_order_gradient', 'second_order_gradient'
-    ] or hparams.update_option == 0 or hparams.update_option == 2)
+    ] or hparams.update_option == UpdateOptions.TF_UPDATE or
+            hparams.update_option
+            == UpdateOptions.TF_AND_PYTHON_UPDATE)
 
   @classmethod
   def ApplyPythonUpdate(cls):  # pylint:disable=invalid-name
     if not cls._pruning_obj:
       return False
     hparams = cls._pruning_obj.get_spec()
-    return hparams.update_option == 1 or hparams.update_option == 2
+    return (hparams.update_option
+            == UpdateOptions.PYTHON_UPDATE or
+            hparams.update_option
+            == UpdateOptions.TF_AND_PYTHON_UPDATE)
 
   @classmethod
   def ApplyTensorflowAndPythonUpdate(cls):  # pylint:disable=invalid-name
@@ -631,7 +646,8 @@ class PruningOp(object):
     if not cls._pruning_obj:
       return False
     hparams = cls._pruning_obj.get_spec()
-    return hparams.update_option == 2
+    return (hparams.update_option ==
+            UpdateOptions.TF_AND_PYTHON_UPDATE)
 
   @classmethod
   def RunPythonUpdate(cls, session, global_step):  # pylint:disable=invalid-name

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Learned Interpreters IPA-GNN model.
 
 This file contains just the IPA-GNN architecture. For the NoControl, NoExecute,
@@ -21,7 +20,7 @@ and GGNN ablation versions of the model, see ipagnn_interpolants.py.
 """
 
 from absl import logging  # pylint: disable=unused-import
-from flax import nn
+from flax.deprecated import nn
 import jax
 from jax import lax
 import jax.numpy as jnp
@@ -58,18 +57,18 @@ class IPAGNN(nn.Module):
     Args:
       inputs: A dictionary with the following fields, each with a leading batch
         dimension.
-        - true_indexes: For each node in the statement-level control flow graph,
-            the index of the node that would be reached if the true branch were
-            followed. If not a branch node, this is simply the index of the next
-            node and matches the index given by false_indexes.
-        - false_indexes: For each node in the statement-level control flow
+        - true_branch_nodes: For each node in the statement-level control flow
+            graph, the index of the node that would be reached if the true
+            branch were followed. If not a branch node, this is simply the index
+            of the next node and matches the index given by false_indexes.
+        - false_branch_nodes: For each node in the statement-level control flow
             graph, the index of the node that would be reached if the false
             branch were followed. If not a branch node, this is simply the index
             of the next node and matches the index given by true_indexes.
-        - start_indexes: The node index where the function starts.
-        - exit_indexes: The node index of the exit-node. Both the true- and
+        - start_index: The node index where the function starts.
+        - exit_index: The node index of the exit-node. Both the true- and
             false- index of the exit node are the exit node itself.
-        - step_limit: The maximum number of model steps to take for a particular
+        - steps: The maximum number of model steps to take for a particular
             program.
         - data: Has shape (4, number of nodes). Each 4-tuple represents a single
             statement in the program. The meaning of each entry in a 4-tuple is
@@ -128,11 +127,10 @@ class IPAGNN(nn.Module):
           rng, cells, (batch_size, num_nodes,), hidden_size)
 
     def _create_instruction_pointer():
-      return jax.ops.index_add(
-          jnp.zeros((batch_size, num_nodes,)),
-          jax.ops.index[:, 0],  # TODO(dbieber): Use "start_index" instead of 0.
-          1
-      )
+      return jnp.zeros((
+          batch_size,
+          num_nodes,
+      )).at[:, 0].add(1)  # TODO(dbieber): Use "start_index" instead of 0.
 
     hidden_states = _create_hidden_states()
     # leaves(hidden_states).shape: batch_size, num_nodes, hidden_size

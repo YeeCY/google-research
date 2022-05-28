@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -97,9 +97,9 @@ class ChunkingProjection : public ChunkingProjectionUntyped {
   explicit ChunkingProjection(const int32_t num_blocks);
 
   Status ProjectInput(const DatapointPtr<T>& input,
-                      ChunkedDatapoint<float>* result) const;
+                      ChunkedDatapoint<float>* chunked) const;
   Status ProjectInput(const DatapointPtr<T>& input,
-                      ChunkedDatapoint<double>* result) const;
+                      ChunkedDatapoint<double>* chunked) const;
 
   int32_t num_blocks() const { return num_blocks_; }
 

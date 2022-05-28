@@ -1,9 +1,39 @@
 # CuBERT
 
 
-## Update 2021/7/11: Fresh Pre-trained Python Models
+## Update 2021/9/22: Evaluating and Training the Models
 
-We are releasing a fresh set of Python pre-training corpus and models, drawn from the BigQuery version of GitHub as of July 11, 2021. This pre-training corpus was deduplicated with the updated process described in [Collection Query](https://github.com/google-research/google-research/tree/master/cubert#collection-query) below. The pre-trained models were BERT Large, and trained for 2 epochs.
+A `run_classifier.py` script (forked from the original BERT version) is provided
+to use the finetuned models for the classification tasks above.
+
+To use it, you first need to download the relevant files above (i.e., the
+corresponding vocabulary, dataset, and model checkpoint) and then need to create
+a BERT configuration file matching the chosen model.
+
+Assuming the downloaded data are stored in `$DATA_DIR`, you can then use the
+following command line to evaluate a model (note that it requires access to the
+`bert` module in your python library path):
+
+```
+python cubert/run_classifier.py
+  --do_train=False
+  --bert_config_file=$DATA_DIR/bert_large_config.json
+  --vocab_file=$DATA_DIR/github_python_minus_ethpy150open_deduplicated_vocabulary.txt
+  --task_name=exception
+  --init_checkpoint=$DATA_DIR/exception__epochs_20__pre_trained_epochs_1/model.ckpt-378
+  --data_dir=$DATA_DIR/exception_datasets
+  --output_dir=exception_results
+  --do_eval=True
+```
+
+This example file was contributed by Marc Brockschmidt <marc+github@marcbrockschmidt.de>. We are grateful for his help!
+
+
+## Update 2021/7/11: Fresh Pre-trained Python and Java Models
+
+We are releasing a fresh set of Python and Java pre-training corpus and models, drawn from the BigQuery version of GitHub as of July 11, 2021. These pre-training corpora were deduplicated with the updated process described in [Collection Query](https://github.com/google-research/google-research/tree/master/cubert#collection-query) below. Note that for the Python corpus, files similar to ETH Py150 Open are also extracted from pre-training. The Java corpus is just internally deduplicated.
+
+The pre-trained models were BERT Large, and trained for 2 epochs.
 
 * Python, deduplicated, BigQuery snapshot as of July 11, 2021.
     * Manifest: [[UI]](https://console.cloud.google.com/storage/browser/cubert/20210711_Python/github_python_minus_ethpy150open_deduplicated_manifest)
@@ -16,6 +46,18 @@ We are releasing a fresh set of Python pre-training corpus and models, drawn fro
         [`gs://cubert/20210711_Python/pre_trained_model_epochs_2__length_1024`].
     * Model checkpoint for length 2048, 2 epochs: [[UI]](https://console.cloud.google.com/storage/browser/cubert/20210711_Python/pre_trained_model_epochs_2__length_2048)
         [`gs://cubert/20210711_Python/pre_trained_model_epochs_2__length_2048`].
+
+* Java, deduplicated, BigQuery snapshot as of July 11, 2021.
+    * Manifest: [[UI]](https://console.cloud.google.com/storage/browser/cubert/20210711_Java/github_java_deduplicated_manifest)
+        [`gs://cubert/20210711_Java/github_java_deduplicated_manifest`].
+    * Vocabulary: [[UI]](https://storage.cloud.google.com/cubert/20210711_Java/github_java_deduplicated_vocabulary.txt)
+        [`gs://cubert/20210711_Java/github_java_deduplicated_vocabulary.txt`].
+    * Model checkpoint for length 512, 2 epochs: [[UI]](https://console.cloud.google.com/storage/browser/cubert/20210711_Java/pre_trained_model_epochs_2__length_512)
+        [`gs://cubert/20210711_Java/pre_trained_model_epochs_2__length_512`].
+    * Model checkpoint for length 1024, 2 epochs: [[UI]](https://console.cloud.google.com/storage/browser/cubert/20210711_Java/pre_trained_model_epochs_2__length_1024)
+        [`gs://cubert/20210711_Java/pre_trained_model_epochs_2__length_1024`].
+    * Model checkpoint for length 2048, 2 epochs: [[UI]](https://console.cloud.google.com/storage/browser/cubert/20210711_Java/pre_trained_model_epochs_2__length_2048)
+        [`gs://cubert/20210711_Java/pre_trained_model_epochs_2__length_2048`].
 
 
 ## Update 2021/03/04: Clarifications

@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ Status DisabledTypeError(TypeTag type_tag) {
       "The '%s' type (type_tag=%d) has been disabled with the "
       "-DSCANN_DISABLE_UNCOMMON_TYPES compile-time flag. Recompile without "
       "this "
-      "flag if you wish to use types other than {float, uint8_t}",
+      "flag if you wish to use types other than {float, uint8}",
       TypeNameFromTag(type_tag), type_tag);
 }
 

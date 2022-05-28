@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ def get_config():
   # be less for small eval datasets.
   config.max_num_eval_steps: int = int(1e5)
 
-  # Initial checkpoint directory (usually from a pre-trained model).
+  # Initial checkpoint directory or filepath (usually from a pre-trained model).
   config.init_checkpoint_dir: str = ""
 
   # Dummy attribute for repeated runs.

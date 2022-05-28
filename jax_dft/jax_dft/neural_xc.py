@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# python3
 """xc functional parameterized by neural network."""
 
 import functools
@@ -21,7 +20,6 @@ import functools
 import jax
 from jax import lax
 from jax import nn
-from jax import tree_util
 from jax.experimental import stax
 import jax.numpy as jnp
 from jax.scipy import ndimage
@@ -104,7 +102,7 @@ def exponential_global_convolution(
   Returns:
     (init_fn, apply_fn) pair.
   """
-  grids = grids.astype(jnp.float32)[::2 ** downsample_factor]
+  grids = grids[::2 ** downsample_factor]
   displacements = jnp.expand_dims(
       grids, axis=0) - jnp.expand_dims(grids, axis=1)
   dx = utils.get_dx(grids)
@@ -223,7 +221,6 @@ def self_interaction_layer(grids, interaction_fn):
   Returns:
     (init_fn, apply_fn) pair.
   """
-  grids = grids.astype(jnp.float32)
   dx = utils.get_dx(grids)
 
   def init_fn(rng, input_shape):
@@ -394,8 +391,8 @@ def linear_interpolation_transpose():
       # scale by 0.5 so downsampling preserves the average activation
       output = 0.5 * vjp_fun(x)[0]
       # need to add back in the edges to account for boundary conditions.
-      output = jax.ops.index_add(output, jax.ops.index[:1], 0.25 * x[:1])
-      output = jax.ops.index_add(output, jax.ops.index[-1:], 0.25 * x[-1:])
+      output = output.at[:1].add(0.25 * x[:1])
+      output = output.at[-1:].add(0.25 * x[-1:])
       return output
 
     return jax.vmap(jax.vmap(downsample, 0, 0), 2, 2)(inputs)
@@ -843,10 +840,6 @@ def global_functional(network, grids, num_spatial_shift=1):
       # (num_spatial_shift, num_grids, num_input_features)
       input_features = _spatial_shift_input(
           input_features, num_spatial_shift=num_spatial_shift)
-    # If the network use convolution layer, the backend function
-    # conv_general_dilated requires float32.
-    input_features = input_features.astype(jnp.float32)
-    params = tree_util.tree_map(lambda x: x.astype(jnp.float32), params)
 
     output = network_apply_fn(params, input_features)
 
@@ -857,7 +850,7 @@ def global_functional(network, grids, num_spatial_shift=1):
     # Remove the batch dimension.
     if num_spatial_shift > 1:
       output = _reverse_spatial_shift_output(output)
-    output = jnp.mean(output, axis=0).astype(jnp.float64)
+    output = jnp.mean(output, axis=0)
 
     return output
 

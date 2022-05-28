@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import chex
 import einops
-import flax.nn as nn
+import flax.deprecated.nn as nn
 import jax
 import jax.numpy as jnp
 from lib import utils
@@ -521,7 +521,7 @@ def extract_patches_from_indices(x,
                       (0, 0)])
 
   @jax.vmap
-  @jax.partial(jax.vmap, in_axes=(None, 0, 0))
+  @functools.partial(jax.vmap, in_axes=(None, 0, 0))
   def patch(image, i, j):
     # Equivalent to image[i:i+patch_size, j:j+patch_size, :]
     return jax.lax.dynamic_slice(image,
@@ -592,8 +592,8 @@ def batch_gather(x, indices):
   return x[indices, Ellipsis]
 
 
-@jax.partial(jax.vmap, in_axes=[0, None])
-@jax.partial(jax.vmap, in_axes=[0, None], out_axes=1)
+@functools.partial(jax.vmap, in_axes=[0, None])
+@functools.partial(jax.vmap, in_axes=[0, None], out_axes=1)
 def make_indicators(indices, num_classes):
   """Create one hot associated to indices.
 

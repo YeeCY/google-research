@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -244,14 +244,6 @@ def l2_score(validation_state,
     axis.append(-3)
 
   return -tf.reduce_mean(diff, axis=axis)
-
-
-def get_backprop_network_spec():
-  state = blur.NetworkSpec()
-  state.backward_update = 'multiplicative_second_state'
-  state.symmetric_in_out_synapses = True
-  state.symmetric_states_synapses = True
-  return state
 
 
 def compute_weight_by_frequency(labels):

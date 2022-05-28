@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -349,7 +349,7 @@ class Avx512<T, kNumRegistersInferred> {
 
     static_assert(!IsSameAny<T, uint8_t, uint16_t, uint32_t, uint64_t>(),
                   "Not Implemented. Unsigned multiplication is limited to "
-                  "_mm512_mul_epu32, which expands from uint32_t=>uint64_t.");
+                  "_mm512_mul_epu32, which expands from uint32=>uint64.");
   }
 
   template <size_t kOther>

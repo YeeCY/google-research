@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ class BruteForceSearcher final : public SingleMachineSearcherBase<T> {
   template <typename WhitelistIterator, typename TopN>
   void FindNeighborsOneToOneInternal(const DatapointPtr<T>& query,
                                      const SearchParameters& params,
-                                     WhitelistIterator* whitelist_iterator,
+                                     WhitelistIterator* allowlist_iterator,
                                      TopN* top_n_ptr) const;
 
   template <typename Float>
@@ -79,6 +79,11 @@ class BruteForceSearcher final : public SingleMachineSearcherBase<T> {
       const DenseDataset<Float>& db, const DenseDataset<Float>& queries,
       ConstSpan<SearchParameters> params,
       MutableSpan<NNResultsVector> results) const;
+
+  void FinishBatchedSearchSimple(const DenseDataset<float>& db,
+                                 const DenseDataset<float>& queries,
+                                 ConstSpan<SearchParameters> params,
+                                 MutableSpan<NNResultsVector> results) const;
 
   template <typename Float>
   enable_if_t<!IsSameAny<Float, float, double>(), void> FinishBatchedSearch(

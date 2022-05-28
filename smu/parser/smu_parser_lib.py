@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
+# Copyright 2022 The Google Research Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """A parser for Small Molecule Universe (SMU) files in custom Uni Basel format.
 
 Used to read contents from SMU files and populates a corresponding protocol
@@ -29,7 +42,6 @@ import traceback
 from absl import logging
 import numpy as np
 
-from tensorflow.io import gfile
 
 from smu import dataset_pb2
 from smu.parser import smu_utils_lib
@@ -102,52 +114,80 @@ class Atomic2FieldTypes(enum.Enum):
 
 
 ATOMIC_LABEL_FIELDS = collections.OrderedDict([
-    ['AT2_BSR_LEFT',
-     ('bond_separation_reaction_left', Atomic2FieldTypes.STRING)],
-    ['AT2_BSR_RIGHT',
-     ('bond_separation_reaction_right', Atomic2FieldTypes.STRING)],
-    ['AT2_T1mol',
-     ('diagnostics_t1_ccsd_2sd', Atomic2FieldTypes.SCALAR)],
-    ['AT2_T1exc',
-     ('diagnostics_t1_ccsd_2sp_excess', Atomic2FieldTypes.SCALAR)],
-    ['AT2_ZPE',
-     ('zpe_atomic', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_ENE_B5',
-     ('single_point_energy_atomic_b5', Atomic2FieldTypes.SCALAR)],
-    ['AT2_ENE_B6',
-     ('single_point_energy_atomic_b6', Atomic2FieldTypes.SCALAR)],
-    ['AT2_ENE_ECCSD',
-     ('single_point_energy_eccsd', Atomic2FieldTypes.SCALAR)],
-    ['AT2_BSE_B5',
-     ('bond_separation_energy_atomic_b5', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_BSE_B6',
-     ('bond_separation_energy_atomic_b6', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_BSE_ECCSD',
-     ('bond_separation_energy_eccsd', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_AEe_B5',
-     ('atomization_energy_excluding_zpe_atomic_b5', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_AEe_B6',
-     ('atomization_energy_excluding_zpe_atomic_b6', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_AEe_ECCSD',
-     ('atomization_energy_excluding_zpe_eccsd', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_AE0_B5',
-     ('atomization_energy_including_zpe_atomic_b5', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_AE0_B6',
-     ('atomization_energy_including_zpe_atomic_b6', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_AE0_ECCSD',
-     ('atomization_energy_including_zpe_eccsd', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_HF0_B5',
-     ('enthalpy_of_formation_0k_atomic_b5', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_HF0_B6',
-     ('enthalpy_of_formation_0k_atomic_b6', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_HF0_ECCSD',
-     ('enthalpy_of_formation_0k_eccsd', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_HF298_B5',
-     ('enthalpy_of_formation_298k_atomic_b5', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_HF298_B6',
-     ('enthalpy_of_formation_298k_atomic_b6', Atomic2FieldTypes.TRIPLE)],
-    ['AT2_HF298_ECCSD',
-     ('enthalpy_of_formation_298k_eccsd', Atomic2FieldTypes.TRIPLE)],
+    [
+        'AT2_BSR_LEFT',
+        ('bond_separation_reaction_left', Atomic2FieldTypes.STRING)
+    ],
+    [
+        'AT2_BSR_RIGHT',
+        ('bond_separation_reaction_right', Atomic2FieldTypes.STRING)
+    ],
+    ['AT2_T1mol', ('diagnostics_t1_ccsd_2sd', Atomic2FieldTypes.SCALAR)],
+    ['AT2_T1exc', ('diagnostics_t1_ccsd_2sp_excess', Atomic2FieldTypes.SCALAR)],
+    ['AT2_ZPE', ('zpe_atomic', Atomic2FieldTypes.TRIPLE)],
+    ['AT2_ENE_B5', ('single_point_energy_atomic_b5', Atomic2FieldTypes.SCALAR)],
+    ['AT2_ENE_B6', ('single_point_energy_atomic_b6', Atomic2FieldTypes.SCALAR)],
+    ['AT2_ENE_ECCSD', ('single_point_energy_eccsd', Atomic2FieldTypes.SCALAR)],
+    [
+        'AT2_BSE_B5',
+        ('bond_separation_energy_atomic_b5', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_BSE_B6',
+        ('bond_separation_energy_atomic_b6', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_BSE_ECCSD',
+        ('bond_separation_energy_eccsd', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_AEe_B5',
+        ('atomization_energy_excluding_zpe_atomic_b5', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_AEe_B6',
+        ('atomization_energy_excluding_zpe_atomic_b6', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_AEe_ECCSD',
+        ('atomization_energy_excluding_zpe_eccsd', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_AE0_B5',
+        ('atomization_energy_including_zpe_atomic_b5', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_AE0_B6',
+        ('atomization_energy_including_zpe_atomic_b6', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_AE0_ECCSD',
+        ('atomization_energy_including_zpe_eccsd', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_HF0_B5',
+        ('enthalpy_of_formation_0k_atomic_b5', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_HF0_B6',
+        ('enthalpy_of_formation_0k_atomic_b6', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_HF0_ECCSD',
+        ('enthalpy_of_formation_0k_eccsd', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_HF298_B5',
+        ('enthalpy_of_formation_298k_atomic_b5', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_HF298_B6',
+        ('enthalpy_of_formation_298k_atomic_b6', Atomic2FieldTypes.TRIPLE)
+    ],
+    [
+        'AT2_HF298_ECCSD',
+        ('enthalpy_of_formation_298k_eccsd', Atomic2FieldTypes.TRIPLE)
+    ],
 ])
 
 PARTIAL_CHARGES_LABEL_FIELDS = collections.OrderedDict([
@@ -253,6 +293,10 @@ class SmuParser:
 
   def _input_generator(self):
     """Yields lines from from input_file."""
+    # This import is here to avoid dependency on gfile except while essential.
+    # This function is the only one that uses gfile.
+    from tensorflow.io import gfile  # pylint: disable=g-import-not-at-top
+
     if not gfile.exists(self.input_file):
       raise FileNotFoundError
 
@@ -441,21 +485,64 @@ class SmuParser:
       self._conformer.original_conformer_index = int(conformer_index)
     return int(num_atoms)
 
-  def parse_error_codes(self):
-    """Converts 6-character error codes into a single error code.
+  def parse_database(self):
+    """Parse the line indicating what database the conformer should go to.
 
-    A SMU file contains a selection of error codes, each with a binary value. We
-    combine the bits into a single error code.
+    This line looks like:
+    Database   standard
     """
-    labels, values = self.parse(ParseModes.ALTERNATING, num_lines=8)
-    assert set(labels) == set(
-        smu_utils_lib.ERROR_CODES.keys()), 'Invalid set of error labels.'
-    assert len(labels) == len(
-        values), 'Expected %d labels and values, but got %d and %d.' % (len(
-            set(smu_utils_lib.ERROR_CODES)), len(labels), len(values))
-    properties = self._conformer.properties
-    for label, value in zip(labels, values):
-      setattr(properties.errors, smu_utils_lib.ERROR_CODES[label], int(value))
+    line = str(self.parse(ParseModes.RAW, num_lines=1)[0])
+    parts = line.split()
+    if len(parts) != 2:
+      raise ValueError('Expected database line, got: {}'.format(line))
+    if parts[0] != 'Database':
+      raise ValueError('Bad keyword on database line, got: {}'.format(parts[0]))
+    if parts[1] == 'standard':
+      self._conformer.which_database = dataset_pb2.STANDARD
+    elif parts[1] == 'complete':
+      self._conformer.which_database = dataset_pb2.COMPLETE
+    else:
+      raise ValueError('Expected database indicator, got: {}'.format(parts[1]))
+
+  def parse_error_codes(self):
+    """Parses the error section with the warning flags."""
+    lines = iter(self.parse(ParseModes.RAW, num_lines=6))
+    errors = self._conformer.properties.errors
+
+    parts = str(next(lines)).split()
+    assert (len(parts) == 2 and parts[0]
+            == 'Status'), ('Expected Status line, got {}'.format(parts))
+    errors.status = int(parts[1])
+
+    parts = str(next(lines)).split()
+    assert (len(parts) == 3 and parts[0]
+            == 'Warn_T1'), ('Expected Status line, got {}'.format(parts))
+    errors.warn_t1 = int(parts[1])
+    errors.warn_t1_excess = int(parts[2])
+
+    parts = str(next(lines)).split()
+    assert (len(parts) == 3 and parts[0]
+            == 'Warn_BSE'), ('Expected Status line, got {}'.format(parts))
+    errors.warn_bse_b5_b6 = int(parts[1])
+    errors.warn_bse_cccsd_b5 = int(parts[2])
+
+    parts = str(next(lines)).split()
+    assert (len(parts) == 4 and parts[0]
+            == 'Warn_EXC'), ('Expected Status line, got {}'.format(parts))
+    errors.warn_exc_lowest_excitation = int(parts[1])
+    errors.warn_exc_smallest_oscillator = int(parts[2])
+    errors.warn_exc_largest_oscillator = int(parts[3])
+
+    parts = str(next(lines)).split()
+    assert (len(parts) == 3 and parts[0]
+            == 'Warn_VIB'), ('Expected Status line, got {}'.format(parts))
+    errors.warn_vib_linearity = int(parts[1])
+    errors.warn_vib_imaginary = int(parts[2])
+
+    parts = str(next(lines)).split()
+    assert (len(parts) == 2 and parts[0]
+            == 'Warn_NEG'), ('Expected Status line, got {}'.format(parts))
+    errors.warn_num_neg = int(parts[1])
 
   def parse_bond_topology(self):
     """Parse region with adjancy matrix, hydrogen count, smiles, and atom types."""
@@ -621,6 +708,8 @@ class SmuParser:
 
   def parse_rotational_constants(self):
     """Parses rotational constants vector (MHz)."""
+    if not self._next_line_startswith('Rotational constants'):
+      return
     constants = self.parse(ParseModes.RAW, num_lines=1)[0]
     values = str(constants).strip().split()[-3:]
     rotational_constants = self._conformer.properties.rotational_constants
@@ -630,6 +719,8 @@ class SmuParser:
 
   def parse_symmetry_used(self):
     """Parses whether or not symmetry was used in the computation."""
+    if not self._next_line_startswith('Symmetry used in calculation'):
+      return
     symmetry = self.parse(ParseModes.RAW, num_lines=1)[0]
     self._conformer.properties.symmetry_used_in_calculation = str(
         symmetry).strip().split()[-1] != 'no'
@@ -751,8 +842,6 @@ class SmuParser:
       line = self.parse(ParseModes.RAW, num_lines=1)[0]
       items = str(line).strip().split()
       properties.diagnostics_d1_ccsd_2sp.value = float(items[2])
-      properties.diagnostics_d1_ccsd_2sd.value = float(items[4])
-      properties.diagnostics_d1_ccsd_3psd.value = float(items[6])
 
     if self._next_line_startswith('T1DIAG'):
       line = self.parse(ParseModes.RAW, num_lines=1)[0]
@@ -1014,7 +1103,8 @@ class SmuParser:
       self._conformer = dataset_pb2.Conformer()
       self.parse(ParseModes.SKIP, num_lines=1)  # Separator.
       num_atoms = self.parse_stage2_header()
-      self.parse_error_codes()  # Error codes.
+      self.parse_database()
+      self.parse_error_codes()
       self.parse_bond_topology()
       self.parse_identifier()
       self.parse_cluster_info(num_lines=8)
@@ -1042,6 +1132,7 @@ class SmuParser:
       # debugging), we add an extra blank line. We'll just skip it here and
       # ignore blank lines at the end.
       self.parse(ParseModes.SKIP_BLANK_LINES)
+
     except (SmuKnownError, ValueError, IndexError, KeyError,
             AssertionError) as exc:
       exc.conformer_id = self._conformer.conformer_id

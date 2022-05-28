@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 
 import collections
 import os
-from typing import List
+from typing import List, Optional
 
 from absl import flags
 from absl import logging
@@ -26,17 +26,25 @@ import tensorflow as tf
 from non_semantic_speech_benchmark.export_model import model_export_utils
 
 Metadata = collections.namedtuple('Metadata', [
-    'xid', 'model_num', 'experiment_dir', 'output_filename', 'params',
+    'xid',
+    'model_num',
+    'experiment_dir',
+    'output_filename',
+    'params',
     'conversion_type',
+    'experiment_name',
 ])
 # Valid conversion types.
 TFLITE_ = 'tflite'
 SAVEDMODEL_ = 'savedmodel'
 
 
-def get_pipeline_metadata(base_experiment_dir, xids,
-                          output_dir,
-                          conversion_types):
+def get_pipeline_metadata(
+    base_experiment_dir,
+    xids,
+    output_dir,
+    conversion_types,
+    output_suffix = None):
   """Get metadata for entire pipeline."""
   for conversion_type in conversion_types:
     if conversion_type not in [TFLITE_, SAVEDMODEL_]:
@@ -48,8 +56,11 @@ def get_pipeline_metadata(base_experiment_dir, xids,
     # Get experiment dirs names, params, and output location.
     exp_names = model_export_utils.get_experiment_dirs(cur_experiment_dir)
     for i, exp_name in enumerate(exp_names):
-      output_filename = os.path.join(output_dir, f'frillsson_{xid}',
-                                     f'model_{i}')
+      if output_suffix:
+        output_filename = os.path.join(
+            output_dir, f'frillsson_{xid}', output_suffix, exp_name)
+      else:
+        output_filename = os.path.join(output_dir, f'frillsson_{xid}', exp_name)
       for conversion_type in conversion_types:
         suffix = '.tflite' if conversion_type == TFLITE_ else '_savedmodel'
         cur_metadata = Metadata(
@@ -59,6 +70,7 @@ def get_pipeline_metadata(base_experiment_dir, xids,
             output_filename=output_filename + suffix,
             params=model_export_utils.get_params(exp_name),
             conversion_type=conversion_type,
+            experiment_name=exp_name,
         )
         metadata.append(cur_metadata)
   return metadata
@@ -90,7 +102,9 @@ def convert_and_write_model(m, include_frontend,
         f'Existing dir didn\'t exist: {os.path.dirname(m.output_filename)}')
   if tflite_friendly:
     model_export_utils.convert_tflite_model(
-        model, quantize=m.params['qat'], model_path=m.output_filename)
+        model,
+        quantize=False,
+        model_path=m.output_filename)
   else:
     assert m.conversion_type == SAVEDMODEL_
     tf.keras.models.save_model(model, m.output_filename)
@@ -104,7 +118,7 @@ def convert_and_write_model(m, include_frontend,
     model_export_utils.sanity_check(
         include_frontend=include_frontend,
         model_path=m.output_filename,
-        embedding_dim=m.params['bd'],
+        embedding_dim=1024,
         tflite=m.conversion_type == TFLITE_,
         n_required=_p_or_flag('n_required'),
         frame_width=_p_or_flag('frame_width'),

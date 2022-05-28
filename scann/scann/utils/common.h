@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ using ::std::vector;
 
 using std::vector;
 
-using ::absl::make_unique;
+using ::std::make_unique;
 
 using ::absl::flat_hash_map;
 using ::absl::flat_hash_set;

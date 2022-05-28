@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,10 @@
 
 #include "scann/hashes/internal/asymmetric_hashing_impl.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <numeric>
+#include <utility>
 
 #include "absl/random/distributions.h"
 #include "scann/data_format/datapoint.h"

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,8 +37,6 @@ flags.DEFINE_string(
     "Absolute path to SentencePiece vocab model.",
     required=True)
 
-flags.DEFINE_integer("random_seed", 0, "Integer for PRNG random seed.")
-
 FLAGS = flags.FLAGS
 
 
@@ -68,7 +66,7 @@ def main(argv):
     raise ValueError("Unknown training mode: %s" % train_mode)
 
   train_lib.train_and_evaluate(FLAGS.config, FLAGS.workdir,
-                               FLAGS.vocab_filepath, FLAGS.random_seed)
+                               FLAGS.vocab_filepath)
 
 
 if __name__ == "__main__":

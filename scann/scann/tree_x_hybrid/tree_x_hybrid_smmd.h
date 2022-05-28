@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -120,6 +120,9 @@ class TreeXHybridSMMD : public SingleMachineSearcherBase<T> {
       SearchParameters& search_params) const final;
 
   StatusOr<SingleMachineFactoryOptions> ExtractSingleMachineFactoryOptions()
+      override;
+
+  StatusOr<shared_ptr<const DenseDataset<float>>> SharedFloatDatasetIfNeeded()
       override;
 
  protected:

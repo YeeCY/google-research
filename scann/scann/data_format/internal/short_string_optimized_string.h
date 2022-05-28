@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ class ShortStringOptimizedString {
   size_t HeapStorageUsed() const {
     if (size() <= kMaxInline) return 0;
     absl::optional<size_t> true_size =
-        MallocExtension::GetAllocatedSize(heap_string());
+        tcmalloc::MallocExtension::GetAllocatedSize(heap_string());
     return *true_size;
   }
 
@@ -92,7 +92,7 @@ class ShortStringOptimizedString {
   }
 
  private:
-  static_assert(sizeof(uint32_t) == 4, "The uint32_t typedef is wrong.");
+  static_assert(sizeof(uint32_t) == 4, "The uint32 typedef is wrong.");
 
   static_assert(sizeof(char*) == 4 || sizeof(char*) == 8,
                 "ScaNN only supports 32- and 64-bit flat memory models.");

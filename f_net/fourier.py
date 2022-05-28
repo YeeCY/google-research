@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,24 +56,3 @@ def _two_dim_matmul(x, matrix_dim_one,
       matrix_dim_one,
       optimize=True,
       precision=precision)
-
-
-@jax.jit
-def fftn(x):
-  """Applies n-dimensional Fast Fourier Transform (FFT) to input array.
-
-  This function reproduces the JAX native n-dimensional FFT, jax.numpy.fftn.
-  For the special case of 2D FFTs, we have found that applying 1D FFTs is
-  faster, on TPUs, than applying the native JAX implementation.
-  TODO(b/181607810): Revisit optimization as XLA FFT implementation improves.
-
-  Args:
-    x: Input n-dimensional array.
-
-  Returns:
-    n-dimensional Fourier transform of input n-dimensional array.
-  """
-  out = x
-  for axis in reversed(range(x.ndim)):
-    out = jnp.fft.fft(out, axis=axis)
-  return out

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,6 +54,37 @@ class DCTTest(tf.test.TestCase):
 
     self.assertAllClose(
         mfcc_output[0][0], dct_output[0][0], rtol=1e-5, atol=1e-6)
+
+  def test_tf_dct_vs_dct_matmul(self):
+
+    signal_size = 51
+    # input signal
+    signal = np.random.rand(1, 1, signal_size)
+
+    # build dct model using tf function
+    input_signal = tf.keras.Input(
+        shape=(
+            1,
+            signal_size,
+        ), batch_size=1)
+    output = dct.DCT(use_tf=False)(input_signal)
+    model1 = tf.keras.Model(input_signal, output)
+    model1.summary()
+    model1_output = model1.predict(signal)
+
+    # build dct model using direct matmul
+    input_signal = tf.keras.Input(
+        shape=(
+            1,
+            signal_size,
+        ), batch_size=1)
+    output = dct.DCT(use_tf=True)(input_signal)
+    model2 = tf.keras.Model(input_signal, output)
+    model2.summary()
+    model2_output = model2.predict(signal)
+
+    self.assertAllClose(
+        model1_output, model2_output, rtol=1e-5, atol=1e-5)
 
 
 if __name__ == "__main__":

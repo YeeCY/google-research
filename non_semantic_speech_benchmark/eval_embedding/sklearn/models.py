@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The Google Research Authors.
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Small models to be finetuned on embeddings."""
 
 from sklearn import discriminant_analysis
@@ -25,7 +24,7 @@ LinearDiscriminantAnalysis = discriminant_analysis.LinearDiscriminantAnalysis
 RandomForestClassifier = ensemble.RandomForestClassifier
 
 
-# pylint:disable=line-too-long,unused-variable, g-no-space-after-comment
+# pylint:disable=line-too-long,unused-variable, g-no-space-after-comment, g-long-lambda
 def get_sklearn_models():
   return {
       'LogisticRegression':
@@ -40,4 +39,4 @@ def get_sklearn_models():
       'LDA_LSQR_AUTO':
           lambda: LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
   }
-# pylint:enable=line-too-long,unused-variable, g-no-space-after-comment
+# pylint:enable=line-too-long,unused-variable, g-no-space-after-comment, g-long-lambda

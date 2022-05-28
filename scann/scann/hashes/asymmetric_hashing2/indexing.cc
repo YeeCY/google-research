@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -163,8 +163,8 @@ Status Indexer<T>::HashWithNoiseShaping(const DatapointPtr<T>& maybe_residual,
   if (quantization_distance_->specially_optimized_distance_tag() !=
       DistanceMeasure::SQUARED_L2) {
     return FailedPreconditionError(
-        "Cannot perform noise-shaped hashing with a non-Squared L2 distance "
-        "measure.");
+        "Cannot perform noise-shaped hashing with a non-Squared L2 "
+        "quantization distance measure.");
   }
   if (!original.IsDense() || !maybe_residual.IsDense()) {
     return UnimplementedError(

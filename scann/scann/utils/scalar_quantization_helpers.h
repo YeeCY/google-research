@@ -1,4 +1,4 @@
-// Copyright 2021 The Google Research Authors.
+// Copyright 2022 The Google Research Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ DatapointPtr<int8_t> ScalarQuantizeFloatDatapoint(
     vector<int8_t>* quantized_storage);
 
 unique_ptr<float[]> PrepareForAsymmetricScalarQuantizedDotProduct(
-    const DatapointPtr<float>& dptr,
+    const DatapointPtr<float>& query,
     ConstSpan<float> inverse_multiplier_by_dimension);
 
 }  // namespace research_scann
