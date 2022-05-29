@@ -50,6 +50,7 @@ for gpu in gpus:
 
 flags.DEFINE_string('root_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
                     'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_bool('run_eagerly', False, 'Enables / disables eager execution of tf.functions.')
 flags.DEFINE_multi_string('gin_file', None, 'Path to the trainer config files.')
 flags.DEFINE_multi_string('gin_bindings', None, 'Gin binding to pass through.')
 
@@ -366,6 +367,8 @@ def train_eval(
 
 def main(_):
   tf.compat.v1.enable_v2_behavior()
+  if FLAGS.run_eagerly:
+    tf.config.run_functions_eagerly(True)
   logging.set_verbosity(logging.INFO)
   gin.parse_config_files_and_bindings(FLAGS.gin_file, FLAGS.gin_bindings)
   root_dir = FLAGS.root_dir

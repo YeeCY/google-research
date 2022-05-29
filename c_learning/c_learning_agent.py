@@ -407,6 +407,7 @@ class CLearningAgent(tf_agent.TFAgent):
       nest_utils.assert_same_structure(time_steps, self.time_step_spec)
       nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
+      # (chongyiz): we are actually using goal-conditioned policy here
       next_actions, _ = self._actions_and_log_probs(next_time_steps)
       target_input = (next_time_steps.observation, next_actions)
       target_q_values1, unused_network_state1 = self._target_critic_network_1(
