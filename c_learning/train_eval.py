@@ -235,19 +235,31 @@ def train_eval(
         tf_env.time_step_spec(), tf_env.action_spec())
     collect_policy = tf_agent.collect_policy
 
-    train_checkpointer = common.Checkpointer(
-        ckpt_dir=train_dir,
-        agent=tf_agent,
-        global_step=global_step,
-        metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
-        max_to_keep=None)
-
-    train_checkpointer.initialize_or_restore()
+    # train_checkpointer = common.Checkpointer(
+    #     ckpt_dir=train_dir,
+    #     agent=tf_agent,
+    #     global_step=global_step,
+    #     metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
+    #     max_to_keep=None)
+    #
+    # train_checkpointer.initialize_or_restore()
 
     replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
         data_spec=tf_agent.collect_data_spec,
         batch_size=tf_env.batch_size,
         max_length=replay_buffer_capacity)
+
+    # (chongyiz): save replay buffer
+    train_checkpointer = common.Checkpointer(
+        ckpt_dir=train_dir,
+        agent=tf_agent,
+        global_step=global_step,
+        replay_buffer=replay_buffer,
+        metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
+        max_to_keep=None)
+
+    train_checkpointer.initialize_or_restore()
+
     replay_observer = [replay_buffer.add_batch]
 
     initial_collect_driver = dynamic_step_driver.DynamicStepDriver(
