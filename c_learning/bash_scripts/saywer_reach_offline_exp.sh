@@ -9,7 +9,7 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(1)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=0
+  export CUDA_VISIBLE_DEVICES=7
   nohup \
   python $PROJECT_DIR/train_eval_offline.py \
     --gin_bindings="train_eval.env_name='sawyer_reach'" \
