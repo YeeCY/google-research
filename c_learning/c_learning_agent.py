@@ -471,11 +471,11 @@ class CLearningAgent(tf_agent.TFAgent):
             critic_loss1 = -next_time_steps.reward * tf.math.log(pred_td_targets1) - \
                            (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets1) - \
                            (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets1)
-            tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
+            # tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
             critic_loss2 = -next_time_steps.reward * tf.math.log(pred_td_targets2) - \
                            (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets2) - \
                            (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets2)
-            tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
+            # tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
 
             critic_loss = critic_loss1 + critic_loss2
 
