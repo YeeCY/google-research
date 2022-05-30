@@ -178,6 +178,7 @@ def train_eval(
             c_learning_utils.DeltaDistance(
                 buffer_size=num_eval_episodes, obs_dim=obs_dim),
         ]
+        # TODO (chongyiz): fix train_metrics bugs
         train_metrics = [
             tf_metrics.NumberOfEpisodes(),
             tf_metrics.EnvironmentSteps(),
