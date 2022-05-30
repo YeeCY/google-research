@@ -463,8 +463,20 @@ class CLearningAgent(tf_agent.TFAgent):
             pred_td_targets2, _ = self._critic_network_2(
                 pred_input, time_steps.step_type, training=training)
 
-            critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
-            critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+            # (chongyiz): cross-entropy implementation of the classifier loss
+            ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
+            ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+
+            # (chongyiz): three term implementation of the classifier loss
+            critic_loss1 = -next_time_steps.reward * tf.math.log(pred_td_targets1) - \
+                           (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets1) - \
+                           (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets1)
+            tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
+            critic_loss2 = -next_time_steps.reward * tf.math.log(pred_td_targets2) - \
+                           (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets2) - \
+                           (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets2)
+            tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
+
             critic_loss = critic_loss1 + critic_loss2
 
             if critic_loss.shape.rank > 1:
@@ -508,16 +520,16 @@ class CLearningAgent(tf_agent.TFAgent):
 
             sampled_actions, log_pi = self._actions_and_log_probs(time_steps)
             target_input = (time_steps.observation, sampled_actions)
-            target_q_values1, _ = self._critic_network_1(
+            q_values1, _ = self._critic_network_1(
                 target_input, time_steps.step_type, training=False)
-            target_q_values2, _ = self._critic_network_2(
+            q_values2, _ = self._critic_network_2(
                 target_input, time_steps.step_type, training=False)
-            target_q_values = tf.minimum(target_q_values1, target_q_values2)
+            q_values = tf.minimum(q_values1, q_values2)
             if ce_loss:
                 actor_loss = tf.keras.losses.binary_crossentropy(
-                    tf.ones_like(target_q_values), target_q_values)
+                    tf.ones_like(q_values), q_values)
             else:
-                actor_loss = -1.0 * target_q_values
+                actor_loss = -1.0 * q_values
 
             if actor_loss.shape.rank > 1:
                 # Sum over the time dimension.
@@ -530,7 +542,7 @@ class CLearningAgent(tf_agent.TFAgent):
                 regularization_loss=reg_loss)
             actor_loss = agg_loss.total_loss
             self._actor_loss_debug_summaries(actor_loss, actions, log_pi,
-                                             target_q_values, time_steps)
+                                             q_values, time_steps)
 
             return actor_loss
 
