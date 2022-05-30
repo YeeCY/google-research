@@ -493,6 +493,16 @@ class CLearningAgent(tf_agent.TFAgent):
             self._critic_loss_debug_summaries(td_targets, pred_td_targets1,
                                               pred_td_targets2, weights)
 
+            # log classifier prediction
+            tf.compat.v2.summary.scalar(
+                name='pred_td_targets1 / (1 - pred_td_targets1)',
+                data=tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1)),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='pred_td_targets2 / (1 - pred_td_targets2)',
+                data=tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2)),
+                step=self.train_step_counter)
+
             return critic_loss
 
     @gin.configurable
