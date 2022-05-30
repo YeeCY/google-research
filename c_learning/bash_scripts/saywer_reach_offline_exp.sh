@@ -6,10 +6,10 @@ PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco200/bin
 export PYTHONPATH=$PROJECT_DIR
 
-declare -a seeds=(0)
+declare -a seeds=(1)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=$seed
+  export CUDA_VISIBLE_DEVICES=0
   nohup \
   python $PROJECT_DIR/train_eval_offline.py \
     --gin_bindings="train_eval.env_name='sawyer_reach'" \
