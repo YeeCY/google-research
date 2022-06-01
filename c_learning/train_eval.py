@@ -278,7 +278,7 @@ def train_eval(
             initial_collect_driver.run = common.function(initial_collect_driver.run)
             collect_driver.run = common.function(collect_driver.run)
             tf_agent.train = common.function(tf_agent.train)
-            # c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
+            c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
 
         # Save the hyperparameters
         operative_filename = os.path.join(root_dir, 'operative.gin')
@@ -292,6 +292,10 @@ def train_eval(
                 'Initializing replay buffer by collecting experience for %d steps '
                 'with a random policy.', initial_collect_steps)
             initial_collect_driver.run()
+
+        # (chongyiz): uncomment the following code if we want to save initial replay buffer
+        # train_checkpointer.save(global_step=global_step.numpy())
+        # exit()
 
         metric_utils.eager_compute(
             eval_metrics,
