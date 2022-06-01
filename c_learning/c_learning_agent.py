@@ -486,11 +486,13 @@ class CLearningAgent(tf_agent.TFAgent):
             critic_loss1 = -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
                            second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
                            second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
-            tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
+            tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
+                                     rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
             critic_loss2 = -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
                            second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
                            second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
-            tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
+            tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
+                                     rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
 
             critic_loss = critic_loss1 + critic_loss2
 
