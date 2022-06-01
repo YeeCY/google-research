@@ -468,24 +468,25 @@ class CLearningAgent(tf_agent.TFAgent):
             # (chongyiz): cross-entropy implementation of the classifier loss
             ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
             ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+            critic_loss = ce_critic_loss1 + ce_critic_loss2
 
             # (chongyiz): three term implementation of the classifier loss,
             # this implementation is similar to https://github.com/keras-team/keras/blob/v2.9.0/keras/losses.py#L496-L596,
             # which will be more numerical stable.
-            pred_td_targets1 = tf.clip_by_value(pred_td_targets1, EPSILON, 1. - EPSILON)
-            pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
-            critic_loss1 = \
-                -next_time_steps.reward * tf.math.log(pred_td_targets1 + EPSILON) - \
-                (1 - next_time_steps.reward) * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
-                (1 - next_time_steps.reward) * tf.stop_gradient(y) * tf.math.log(pred_td_targets1 + EPSILON)
-            tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
-            critic_loss2 = \
-                -next_time_steps.reward * tf.math.log(pred_td_targets2 + EPSILON) - \
-                (1 - next_time_steps.reward) * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
-                (1 - next_time_steps.reward) * tf.stop_gradient(y) * tf.math.log(pred_td_targets2 + EPSILON)
-            tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
+            # pred_td_targets1 = tf.clip_by_value(pred_td_targets1, EPSILON, 1. - EPSILON)
+            # pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
+            # critic_loss1 = \
+            #     -next_time_steps.reward * tf.math.log(pred_td_targets1 + EPSILON) - \
+            #     (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
+            #     (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets1 + EPSILON)
+            # tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
+            # critic_loss2 = \
+            #     -next_time_steps.reward * tf.math.log(pred_td_targets2 + EPSILON) - \
+            #     (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
+            #     (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets2 + EPSILON)
+            # tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
 
-            critic_loss = critic_loss1 + critic_loss2
+            # critic_loss = critic_loss1 + critic_loss2
 
             if critic_loss.shape.rank > 1:
                 # Sum over the time dimension.
