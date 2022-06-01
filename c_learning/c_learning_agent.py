@@ -468,14 +468,19 @@ class CLearningAgent(tf_agent.TFAgent):
             ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
 
             # (chongyiz): three term implementation of the classifier loss
-            critic_loss1 = -next_time_steps.reward * tf.math.log(pred_td_targets1) - \
-                           (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets1) - \
-                           (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets1)
-            # tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
-            critic_loss2 = -next_time_steps.reward * tf.math.log(pred_td_targets2) - \
-                           (1 - next_time_steps.reward) * (1 - y) * tf.math.log(1 - pred_td_targets2) - \
-                           (1 - next_time_steps.reward) * y * tf.math.log(pred_td_targets2)
-            # tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
+            try:
+                critic_loss1 = \
+                    -next_time_steps.reward * tf.math.log(pred_td_targets1) - \
+                    (1 - next_time_steps.reward) * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets1) - \
+                    (1 - next_time_steps.reward) * tf.stop_gradient(y) * tf.math.log(pred_td_targets1)
+                tf.debugging.assert_near(ce_critic_loss1, critic_loss1)
+                critic_loss2 = \
+                    -next_time_steps.reward * tf.math.log(pred_td_targets2) - \
+                    (1 - next_time_steps.reward) * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets2) - \
+                    (1 - next_time_steps.reward) * tf.stop_gradient(y) * tf.math.log(pred_td_targets2)
+                tf.debugging.assert_near(ce_critic_loss2, critic_loss2)
+            except:
+                print()
 
             critic_loss = critic_loss1 + critic_loss2
 
