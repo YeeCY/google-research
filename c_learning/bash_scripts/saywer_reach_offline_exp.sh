@@ -12,6 +12,7 @@ declare -a seeds=(1)
 
 for seed in "${seeds[@]}"; do
   export CUDA_VISIBLE_DEVICES=$GPUS
+  mkdir -p ~/offline_c_learning/c_learning_offline_logs/sawyer_reach_600k/$seed
   nohup \
   python $PROJECT_DIR/train_eval_offline.py \
     --gin_bindings="train_eval.env_name='sawyer_reach'" \
