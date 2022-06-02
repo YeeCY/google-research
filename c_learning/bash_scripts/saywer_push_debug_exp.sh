@@ -1,5 +1,7 @@
 #!/bin/bash
 
+GPUS=$1
+
 SCRIPT_DIR=$(dirname "$BASH_SOURCE")
 PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
 
@@ -9,7 +11,7 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=0
+  export CUDA_VISIBLE_DEVICES=$GPUS
   nohup \
   python $PROJECT_DIR/train_eval.py \
     --gin_bindings="train_eval.env_name='sawyer_push'" \
@@ -23,5 +25,5 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="load_sawyer_push.random_init=True" \
     --gin_bindings="load_sawyer_push.wide_goals=True" \
     --root_dir ~/offline_c_learning/c_learning_logs_debug/sawyer_push/$seed \
-  > ~/offline_c_learning/terminal_logs/debug/sawyer_push-"$seed".log 2>&1 &
+  > ~/offline_c_learning/c_learning_logs_debug/sawyer_push/$seed/stream.log 2>&1 &
 done
