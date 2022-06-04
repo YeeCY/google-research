@@ -254,7 +254,7 @@ def train_eval(
             ckpt_dir=train_dir,
             agent=tf_agent,
             global_step=global_step,
-            # replay_buffer=replay_buffer,
+            replay_buffer=replay_buffer,
             metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
             max_to_keep=None)
 
