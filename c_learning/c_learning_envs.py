@@ -111,6 +111,7 @@ def load_sawyer_faucet():
     )
     return tf_py_environment.TFPyEnvironment(env)
 
+
 def load_maze2d_umaze_v1():
     # gym_env =
     pass
@@ -468,9 +469,6 @@ class SawyerFaucet(sawyer_xyz.SawyerFaucetOpenEnv):
         obs = super(SawyerFaucet, self)._get_obs()
         return np.concatenate([obs, self._arm_goal, self.goal])
 
-#
-# import d4rl
-# from d4rl.pointmaze import MazeEnv
 
 class Maze2DUmazeV1(pointmaze.MazeEnv):
     """Wrapper for the D4RL maze2d-umaze-v1 task."""
@@ -480,7 +478,6 @@ class Maze2DUmazeV1(pointmaze.MazeEnv):
                  reward_type='sparse',
                  reset_target=False,
                  **kwargs):
-        # super(SawyerReach, self).__init__(task_type='reach')
         super(Maze2DUmazeV1, self).__init__(
             maze_spec=maze_spec,
             reward_type=reward_type,
@@ -498,16 +495,17 @@ class Maze2DUmazeV1(pointmaze.MazeEnv):
         # self.goal = goal
 
         # TODO (chongyiz): implement sample_goals
-        self.goal = self.sample_goals(1)[0]
+        # self.goal = self.sample_goals(1)[0]
+        self.goal = None
 
-        return self.reset_model()
+        return super(Maze2DUmazeV1, self).reset()
 
     def step(self, action):
-        s, r, done, info = super(SawyerReach, self).step(action)
+        s, r, done, info = super(Maze2DUmazeV1, self).step(action)
         r = 0.0
         done = False
         return s, r, done, info
 
     def _get_obs(self):
-        obs = super(SawyerReach, self)._get_obs()
+        obs = super(Maze2DUmazeV1, self)._get_obs()
         return np.concatenate([obs, self.goal, np.zeros(3)])
