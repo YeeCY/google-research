@@ -466,8 +466,8 @@ class CLearningAgent(tf_agent.TFAgent):
                 pred_input, time_steps.step_type, training=training)
 
             # (chongyiz): cross-entropy implementation of the classifier loss
-            ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
-            ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+            # ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
+            # ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
             # critic_loss = ce_critic_loss1 + ce_critic_loss2
 
             # (chongyiz): three term implementation of the classifier loss,

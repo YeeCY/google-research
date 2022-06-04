@@ -50,6 +50,8 @@ for gpu in gpus:
 
 flags.DEFINE_string('root_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
                     'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_string('dataset_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
+                    'Directory for restoring replay buffer from pre-trained agent')
 flags.DEFINE_bool('run_eagerly', False, 'Enables / disables eager execution of tf.functions.')
 flags.DEFINE_multi_string('gin_file', None, 'Path to the trainer config files.')
 flags.DEFINE_multi_string('gin_bindings', None, 'Gin binding to pass through.')
@@ -67,6 +69,7 @@ def bce_loss(y_true, y_pred, label_smoothing=0):
 @gin.configurable
 def train_eval(
         root_dir,
+        dataset_dir,
         env_name='sawyer_reach',
         num_iterations=3000000,
         actor_fc_layers=(256, 256),
@@ -74,8 +77,8 @@ def train_eval(
         critic_action_fc_layers=None,
         critic_joint_fc_layers=(256, 256),
         # Params for collect
-        initial_collect_steps=10000,
-        collect_steps_per_iteration=1,
+        # initial_collect_steps=10000,
+        # collect_steps_per_iteration=1,
         replay_buffer_capacity=1000000,
         # Params for target update
         target_update_tau=0.005,
@@ -108,6 +111,7 @@ def train_eval(
     tf.random.set_seed(random_seed)
 
     root_dir = os.path.expanduser(root_dir)
+    dataset_dir = os.path.expanduser(dataset_dir)
     train_dir = os.path.join(root_dir, 'train')
     eval_dir = os.path.join(root_dir, 'eval')
 
@@ -174,6 +178,7 @@ def train_eval(
             c_learning_utils.DeltaDistance(
                 buffer_size=num_eval_episodes, obs_dim=obs_dim),
         ]
+        # TODO (chongyiz): fix train_metrics bugs
         train_metrics = [
             tf_metrics.NumberOfEpisodes(),
             tf_metrics.EnvironmentSteps(),
@@ -231,9 +236,9 @@ def train_eval(
                 ])
 
         eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
-        initial_collect_policy = random_tf_policy.RandomTFPolicy(
-            tf_env.time_step_spec(), tf_env.action_spec())
-        collect_policy = tf_agent.collect_policy
+        # initial_collect_policy = random_tf_policy.RandomTFPolicy(
+        #     tf_env.time_step_spec(), tf_env.action_spec())
+        # collect_policy = tf_agent.collect_policy
 
         # train_checkpointer = common.Checkpointer(
         #     ckpt_dir=train_dir,
@@ -244,39 +249,43 @@ def train_eval(
         #
         # train_checkpointer.initialize_or_restore()
 
+        # (chongyiz): restore replay buffer
         replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
             data_spec=tf_agent.collect_data_spec,
             batch_size=tf_env.batch_size,
             max_length=replay_buffer_capacity)
 
-        # (chongyiz): save replay buffer
+        replay_buffer_checkpointer = common.Checkpointer(
+            ckpt_dir=dataset_dir,
+            replay_buffer=replay_buffer)
+        replay_buffer_checkpointer.initialize_or_restore()
+
+        # create train checkpointer
         train_checkpointer = common.Checkpointer(
             ckpt_dir=train_dir,
             agent=tf_agent,
             global_step=global_step,
-            # replay_buffer=replay_buffer,
             metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
             max_to_keep=None)
-
         train_checkpointer.initialize_or_restore()
 
-        replay_observer = [replay_buffer.add_batch]
-
-        initial_collect_driver = dynamic_step_driver.DynamicStepDriver(
-            tf_env,
-            initial_collect_policy,
-            observers=replay_observer + train_metrics,
-            num_steps=initial_collect_steps)
-
-        collect_driver = dynamic_step_driver.DynamicStepDriver(
-            tf_env,
-            collect_policy,
-            observers=replay_observer + train_metrics,
-            num_steps=collect_steps_per_iteration)
+        # replay_observer = [replay_buffer.add_batch]
+        #
+        # initial_collect_driver = dynamic_step_driver.DynamicStepDriver(
+        #     tf_env,
+        #     initial_collect_policy,
+        #     observers=replay_observer + train_metrics,
+        #     num_steps=initial_collect_steps)
+        #
+        # collect_driver = dynamic_step_driver.DynamicStepDriver(
+        #     tf_env,
+        #     collect_policy,
+        #     observers=replay_observer + train_metrics,
+        #     num_steps=collect_steps_per_iteration)
 
         if use_tf_functions:
-            initial_collect_driver.run = common.function(initial_collect_driver.run)
-            collect_driver.run = common.function(collect_driver.run)
+            # initial_collect_driver.run = common.function(initial_collect_driver.run)
+            # collect_driver.run = common.function(collect_driver.run)
             tf_agent.train = common.function(tf_agent.train)
             # c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
 
@@ -286,16 +295,13 @@ def train_eval(
             f.write(gin.operative_config_str())
             logging.info(gin.operative_config_str())
 
-        if replay_buffer.num_frames() == 0:
-            # Collect initial replay data.
-            logging.info(
-                'Initializing replay buffer by collecting experience for %d steps '
-                'with a random policy.', initial_collect_steps)
-            initial_collect_driver.run()
-
-        # (chongyiz): uncomment the following code if we want to save initial replay buffer
-        # train_checkpointer.save(global_step=global_step.numpy())
-        # exit()
+        # if replay_buffer.num_frames() == 0:
+        #     # Collect initial replay data.
+        #     logging.info(
+        #         'Initializing replay buffer by collecting experience for %d steps '
+        #         'with a random policy.', initial_collect_steps)
+        #     initial_collect_driver.run()
+        assert replay_buffer.num_frames() > 0, "Restore an empty replay buffer!"
 
         metric_utils.eager_compute(
             eval_metrics,
@@ -308,8 +314,8 @@ def train_eval(
         )
         metric_utils.log_metrics(eval_metrics)
 
-        time_step = None
-        policy_state = collect_policy.get_initial_state(tf_env.batch_size)
+        # time_step = None
+        # policy_state = collect_policy.get_initial_state(tf_env.batch_size)
 
         timed_at_step = global_step.numpy()
         time_acc = 0
@@ -341,10 +347,10 @@ def train_eval(
         global_step_val = global_step.numpy()
         while global_step_val < num_iterations:
             start_time = time.time()
-            time_step, policy_state = collect_driver.run(
-                time_step=time_step,
-                policy_state=policy_state,
-            )
+            # time_step, policy_state = collect_driver.run(
+            #     time_step=time_step,
+            #     policy_state=policy_state,
+            # )
             for _ in range(train_steps_per_iteration):
                 train_loss = train_step()
             time_acc += time.time() - start_time
@@ -390,7 +396,8 @@ def main(_):
     logging.set_verbosity(logging.INFO)
     gin.parse_config_files_and_bindings(FLAGS.gin_file, FLAGS.gin_bindings)
     root_dir = FLAGS.root_dir
-    train_eval(root_dir)
+    dataset_dir = FLAGS.dataset_dir
+    train_eval(root_dir, dataset_dir)
 
 
 if __name__ == '__main__':

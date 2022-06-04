@@ -26,6 +26,9 @@ import gin
 import gym
 from metaworld.envs.mujoco import sawyer_xyz
 import mujoco_py
+# import d4rl
+from d4rl.pointmaze import MazeEnv
+from d4rl import pointmaze
 import numpy as np
 from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
@@ -108,6 +111,10 @@ def load_sawyer_faucet():
     )
     return tf_py_environment.TFPyEnvironment(env)
 
+def load_maze2d_umaze_v1():
+    # gym_env =
+    pass
+
 
 def load(env_name):
     """Creates the training and evaluation environment.
@@ -137,6 +144,9 @@ def load(env_name):
     elif env_name == 'sawyer_faucet':
         tf_env = load_sawyer_faucet()
         eval_tf_env = load_sawyer_faucet()
+    elif env_name == 'maze2d-umaze-v1':
+        tf_env = load_maze2d_umaze_v1()
+        eval_tf_env = load_maze2d_umaze_v1()
     else:
         raise NotImplementedError('Unsupported environment: %s' % env_name)
     assert len(tf_env.envs) == 1
@@ -457,3 +467,47 @@ class SawyerFaucet(sawyer_xyz.SawyerFaucetOpenEnv):
     def _get_obs(self):
         obs = super(SawyerFaucet, self)._get_obs()
         return np.concatenate([obs, self._arm_goal, self.goal])
+
+#
+# import d4rl
+# from d4rl.pointmaze import MazeEnv
+
+class Maze2DUmazeV1(pointmaze.MazeEnv):
+    """Wrapper for the D4RL maze2d-umaze-v1 task."""
+
+    def __init__(self,
+                 maze_spec=pointmaze.U_MAZE,
+                 reward_type='sparse',
+                 reset_target=False,
+                 **kwargs):
+        # super(SawyerReach, self).__init__(task_type='reach')
+        super(Maze2DUmazeV1, self).__init__(
+            maze_spec=maze_spec,
+            reward_type=reward_type,
+            reset_target=reset_target,
+            **kwargs
+        )
+
+        self.observation_space = gym.spaces.Box(
+            low=np.full(8, -np.inf),
+            high=np.full(8, np.inf),
+            dtype=np.float32)
+
+    def reset(self):
+        # goal = self.sample_goals(1)['state_desired_goal'][0]
+        # self.goal = goal
+
+        # TODO (chongyiz): implement sample_goals
+        self.goal = self.sample_goals(1)[0]
+
+        return self.reset_model()
+
+    def step(self, action):
+        s, r, done, info = super(SawyerReach, self).step(action)
+        r = 0.0
+        done = False
+        return s, r, done, info
+
+    def _get_obs(self):
+        obs = super(SawyerReach, self)._get_obs()
+        return np.concatenate([obs, self.goal, np.zeros(3)])
