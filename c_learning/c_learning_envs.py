@@ -30,7 +30,6 @@ import numpy as np
 import h5py
 from tqdm import tqdm
 
-import d4rl
 from d4rl.offline_env import download_dataset_from_url, get_keys
 from d4rl import pointmaze
 
@@ -116,14 +115,41 @@ def load_sawyer_faucet():
     return tf_py_environment.TFPyEnvironment(env)
 
 
+def load_maze2d_open_v0():
+    gym_env = Maze2DOpenV0()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=150,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
 def load_maze2d_umaze_v1():
     gym_env = Maze2DUmazeV1()
-    # # dataset = gym_env.get_dataset()
-    # trajectories = list(d4rl.sequence_dataset(gym_env))
-
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=300,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_maze2d_medium_v1():
+    gym_env = Maze2DMediumV1()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=600,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_maze2d_large_v1():
+    gym_env = Maze2DLargeV1()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=800,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -157,9 +183,18 @@ def load(env_name):
     elif env_name == 'sawyer_faucet':
         tf_env = load_sawyer_faucet()
         eval_tf_env = load_sawyer_faucet()
+    elif env_name == 'maze2d-open-v0':
+        tf_env = load_maze2d_open_v0()
+        eval_tf_env = load_maze2d_open_v0()
     elif env_name == 'maze2d-umaze-v1':
         tf_env = load_maze2d_umaze_v1()
         eval_tf_env = load_maze2d_umaze_v1()
+    elif env_name == 'maze2d-medium-v1':
+        tf_env = load_maze2d_medium_v1()
+        eval_tf_env = load_maze2d_medium_v1()
+    elif env_name == 'maze2d-large-v1':
+        tf_env = load_maze2d_large_v1()
+        eval_tf_env = load_maze2d_large_v1()
     else:
         raise NotImplementedError('Unsupported environment: %s' % env_name)
     assert len(tf_env.envs) == 1
@@ -482,34 +517,9 @@ class SawyerFaucet(sawyer_xyz.SawyerFaucetOpenEnv):
         return np.concatenate([obs, self._arm_goal, self.goal])
 
 
-class Maze2DUmazeV1(pointmaze.MazeEnv):
-    """Wrapper for the D4RL maze2d-umaze-v1 task."""
-
-    def __init__(self,
-                 maze_spec=pointmaze.U_MAZE,
-                 reward_type='sparse',
-                 reset_target=True,
-                 ref_min_score=23.85,
-                 ref_max_score=161.86,
-                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-umaze-sparse-v1.hdf5',
-                 **kwargs):
-        super(Maze2DUmazeV1, self).__init__(
-            maze_spec=maze_spec,
-            reward_type=reward_type,
-            reset_target=reset_target,
-            ref_min_score=ref_min_score,
-            ref_max_score=ref_max_score,
-            dataset_url=dataset_url,
-            **kwargs
-        )
-
-        # self.dataset = self.get_dataset()
-        # self._preprocess_dataset()
-
-        # self.observation_space = gym.spaces.Box(
-        #     low=np.full(8, -np.inf),
-        #     high=np.full(8, np.inf),
-        #     dtype=np.float32)
+class Maze2DBase(pointmaze.MazeEnv):
+    def __init__(self, **kwargs):
+        super(Maze2DBase, self).__init__(**kwargs)
 
     def get_dataset(self, h5path=None):
         if h5path is None:
@@ -551,11 +561,99 @@ class Maze2DUmazeV1(pointmaze.MazeEnv):
         return data_dict
 
     def step(self, action):
-        obs, reward, done, info = super(Maze2DUmazeV1, self).step(action)
+        obs, reward, done, info = super(Maze2DBase, self).step(action)
         reward = 0.0
         done = False
         return obs, reward, done, info
 
     def _get_obs(self):
-        obs = super(Maze2DUmazeV1, self)._get_obs()
+        obs = super(Maze2DBase, self)._get_obs()
         return np.concatenate([obs, self._target, np.zeros(2)], dtype=np.float32)
+
+
+class Maze2DOpenV0(Maze2DBase):
+    """Wrapper for the D4RL maze2d-open-v0 task."""
+
+    def __init__(self,
+                 maze_spec=pointmaze.OPEN,
+                 reward_type='sparse',
+                 reset_target=True,
+                 ref_min_score=0.01,
+                 ref_max_score=20.66,
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-open-sparse.hdf5',
+                 **kwargs):
+        super(Maze2DOpenV0, self).__init__(
+            maze_spec=maze_spec,
+            reward_type=reward_type,
+            reset_target=reset_target,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            dataset_url=dataset_url,
+            **kwargs
+        )
+
+
+class Maze2DUmazeV1(Maze2DBase):
+    """Wrapper for the D4RL maze2d-umaze-v1 task."""
+
+    def __init__(self,
+                 maze_spec=pointmaze.U_MAZE,
+                 reward_type='sparse',
+                 reset_target=True,
+                 ref_min_score=23.85,
+                 ref_max_score=161.86,
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-umaze-sparse-v1.hdf5',
+                 **kwargs):
+        super(Maze2DUmazeV1, self).__init__(
+            maze_spec=maze_spec,
+            reward_type=reward_type,
+            reset_target=reset_target,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            dataset_url=dataset_url,
+            **kwargs
+        )
+
+
+class Maze2DMediumV1(Maze2DBase):
+    """Wrapper for the D4RL maze2d-medium-v1 task."""
+
+    def __init__(self,
+                 maze_spec=pointmaze.MEDIUM_MAZE,
+                 reward_type='sparse',
+                 reset_target=True,
+                 ref_min_score=13.13,
+                 ref_max_score=277.39,
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-medium-sparse-v1.hdf5',
+                 **kwargs):
+        super(Maze2DMediumV1, self).__init__(
+            maze_spec=maze_spec,
+            reward_type=reward_type,
+            reset_target=reset_target,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            dataset_url=dataset_url,
+            **kwargs
+        )
+
+
+class Maze2DLargeV1(Maze2DBase):
+    """Wrapper for the D4RL maze2d-large-v1 task."""
+
+    def __init__(self,
+                 maze_spec=pointmaze.LARGE_MAZE,
+                 reward_type='sparse',
+                 reset_target=True,
+                 ref_min_score=6.7,
+                 ref_max_score=273.99,
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-large-sparse-v1.hdf5',
+                 **kwargs):
+        super(Maze2DLargeV1, self).__init__(
+            maze_spec=maze_spec,
+            reward_type=reward_type,
+            reset_target=reset_target,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            dataset_url=dataset_url,
+            **kwargs
+        )
