@@ -21,6 +21,8 @@ from tf_agents.agents.ddpg import critic_network
 from tf_agents.metrics import tf_metric
 from tf_agents.metrics import tf_metrics
 from tf_agents.utils import common
+from tf_agents.utils import nest_utils
+from tf_agents.replay_buffers import tf_uniform_replay_buffer
 
 
 def truncated_geometric(horizon, gamma):
@@ -318,3 +320,30 @@ class DeltaDistance(BaseDistanceMetric):
     def _update_buffer(self):
         delta_dist = self._dist_buffer.data[0] - self._dist_buffer.data[-1]
         self._buffer.add(delta_dist)
+
+
+class TFUniformReplayBuffer(tf_uniform_replay_buffer.TFUniformReplayBuffer):
+    def add_episode(self, episode_items):
+        """Adds an episode of items to the replay buffer.
+
+        Args:
+          episode_items: An item or list/tuple/nest of episodic items to be added to the replay
+            buffer. `episode_items` must match the data_spec of this class, with a
+            batch_size dimension added to the beginning of each tensor/array.
+
+        Returns:
+          Adds `items` to the replay buffer.
+        """
+        nest_utils.assert_same_structure(episode_items, self._data_spec)
+        num_timesteps = nest_utils.get_outer_shape(
+            tf.nest.map_structure(tf.convert_to_tensor, episode_items),
+            self._data_spec)[0]
+
+        with tf.device(self._device), tf.name_scope(self._scope):
+            min_id = tf.identity(self._last_id + 1)
+            max_id = self._increment_last_id(tf.cast(num_timesteps, tf.int64))
+            ids = tf.range(min_id, max_id + 1)
+            write_rows = self._get_rows_for_id(ids)
+            write_id_op = self._id_table.write(write_rows, ids)
+            write_data_op = self._data_table.write(write_rows, episode_items)
+            return tf.group(write_id_op, write_data_op)

@@ -26,10 +26,14 @@ import gin
 import gym
 from metaworld.envs.mujoco import sawyer_xyz
 import mujoco_py
-# import d4rl
-from d4rl.pointmaze import MazeEnv
-from d4rl import pointmaze
 import numpy as np
+import h5py
+from tqdm import tqdm
+
+import d4rl
+from d4rl.offline_env import download_dataset_from_url, get_keys
+from d4rl import pointmaze
+
 from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
 from tf_agents.environments import wrappers
@@ -113,8 +117,16 @@ def load_sawyer_faucet():
 
 
 def load_maze2d_umaze_v1():
-    # gym_env =
-    pass
+    gym_env = Maze2DUmazeV1()
+    # # dataset = gym_env.get_dataset()
+    # trajectories = list(d4rl.sequence_dataset(gym_env))
+
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=300,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
 
 
 def load(env_name):
@@ -476,36 +488,74 @@ class Maze2DUmazeV1(pointmaze.MazeEnv):
     def __init__(self,
                  maze_spec=pointmaze.U_MAZE,
                  reward_type='sparse',
-                 reset_target=False,
+                 reset_target=True,
+                 ref_min_score=23.85,
+                 ref_max_score=161.86,
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-umaze-sparse-v1.hdf5',
                  **kwargs):
         super(Maze2DUmazeV1, self).__init__(
             maze_spec=maze_spec,
             reward_type=reward_type,
             reset_target=reset_target,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            dataset_url=dataset_url,
             **kwargs
         )
 
-        self.observation_space = gym.spaces.Box(
-            low=np.full(8, -np.inf),
-            high=np.full(8, np.inf),
-            dtype=np.float32)
+        # self.dataset = self.get_dataset()
+        # self._preprocess_dataset()
 
-    def reset(self):
-        # goal = self.sample_goals(1)['state_desired_goal'][0]
-        # self.goal = goal
+        # self.observation_space = gym.spaces.Box(
+        #     low=np.full(8, -np.inf),
+        #     high=np.full(8, np.inf),
+        #     dtype=np.float32)
 
-        # TODO (chongyiz): implement sample_goals
-        # self.goal = self.sample_goals(1)[0]
-        self.goal = None
+    def get_dataset(self, h5path=None):
+        if h5path is None:
+            if self._dataset_url is None:
+                raise ValueError("Offline env not configured with a dataset URL.")
+            h5path = download_dataset_from_url(self.dataset_url)
 
-        return super(Maze2DUmazeV1, self).reset()
+        data_dict = {}
+        with h5py.File(h5path, 'r') as dataset_file:
+            for k in tqdm(get_keys(dataset_file), desc="load datafile"):
+                try:  # first try loading as an array
+                    data_dict[k] = dataset_file[k][:]
+                except ValueError as e:  # try loading as a scalar
+                    data_dict[k] = dataset_file[k][()]
+
+        # Run a few quick sanity checks
+        for key in ['observations', 'actions', 'rewards', 'terminals']:
+            assert key in data_dict, 'Dataset is missing key %s' % key
+        N_samples = data_dict['observations'].shape[0]
+        # (chongyiz): concatenate goals to observations
+        assert 'infos/goal' in data_dict
+        data_dict['observations'] = np.concatenate([
+            data_dict['observations'], data_dict['infos/goal'], np.zeros([N_samples, 2])], axis=-1)
+        if self.observation_space.shape is not None:
+            assert data_dict['observations'].shape[1:] == self.observation_space.shape, \
+                'Observation shape does not match env: %s vs %s' % (
+                    str(data_dict['observations'].shape[1:]), str(self.observation_space.shape))
+        assert data_dict['actions'].shape[1:] == self.action_space.shape, \
+            'Action shape does not match env: %s vs %s' % (
+                str(data_dict['actions'].shape[1:]), str(self.action_space.shape))
+        if data_dict['rewards'].shape == (N_samples, 1):
+            data_dict['rewards'] = data_dict['rewards'][:, 0]
+        assert data_dict['rewards'].shape == (N_samples,), 'Reward has wrong shape: %s' % (
+            str(data_dict['rewards'].shape))
+        if data_dict['terminals'].shape == (N_samples, 1):
+            data_dict['terminals'] = data_dict['terminals'][:, 0]
+        assert data_dict['terminals'].shape == (N_samples,), 'Terminals has wrong shape: %s' % (
+            str(data_dict['rewards'].shape))
+        return data_dict
 
     def step(self, action):
-        s, r, done, info = super(Maze2DUmazeV1, self).step(action)
-        r = 0.0
+        obs, reward, done, info = super(Maze2DUmazeV1, self).step(action)
+        reward = 0.0
         done = False
-        return s, r, done, info
+        return obs, reward, done, info
 
     def _get_obs(self):
         obs = super(Maze2DUmazeV1, self)._get_obs()
-        return np.concatenate([obs, self.goal, np.zeros(3)])
+        return np.concatenate([obs, self._target, np.zeros(2)])
