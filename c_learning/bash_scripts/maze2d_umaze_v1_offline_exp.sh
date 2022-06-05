@@ -24,6 +24,5 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="goal_fn.relabel_next_prob=0.5" \
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/maze2d_umaze_v1/$seed \
-    --dataset_dir ~/offline_c_learning/c_learning_logs/maze2d_umaze_v1/$seed/train \
   > ~/offline_c_learning/c_learning_offline_logs/maze2d_umaze_v1/$seed/stream.log 2>&1 &
 done
