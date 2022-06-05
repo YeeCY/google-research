@@ -558,4 +558,4 @@ class Maze2DUmazeV1(pointmaze.MazeEnv):
 
     def _get_obs(self):
         obs = super(Maze2DUmazeV1, self)._get_obs()
-        return np.concatenate([obs, self._target, np.zeros(2)])
+        return np.concatenate([obs, self._target, np.zeros(2)], dtype=np.float32)

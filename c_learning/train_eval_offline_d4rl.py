@@ -273,7 +273,7 @@ def train_eval(
         start_time = time.time()
         for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
             episode = trajectories.trajectory.from_episode(
-                observation=traj['observations'][..., indices], policy_info=(),
+                observation=traj['observations'][..., indices].astype(np.float32), policy_info=(),
                 action=traj['actions'], reward=traj['rewards'])
             replay_buffer.add_episode(episode)
         end_time = time.time()
