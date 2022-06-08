@@ -157,10 +157,30 @@ def load_maze2d_large_v1():
 
 
 def load_antmaze_umaze_diverse_v0():
-    gym_env = AntMazeUmazeV0()
+    gym_env = AntMazeUmazeDiverseV0()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=800,
+        max_episode_steps=700,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_antmaze_medium_diverse_v0():
+    gym_env = AntMazeMediumDiverseV0()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=1000,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_antmaze_large_diverse_v0():
+    gym_env = AntMazeLargeDiverseV0()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=1000,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -209,6 +229,12 @@ def load(env_name):
     elif env_name == 'antmaze-umaze-diverse-v0':
         tf_env = load_antmaze_umaze_diverse_v0()
         eval_tf_env = load_antmaze_umaze_diverse_v0()
+    elif env_name == 'antmaze-medium-diverse-v0':
+        tf_env = load_antmaze_medium_diverse_v0()
+        eval_tf_env = load_antmaze_medium_diverse_v0()
+    elif env_name == 'antmaze-large-diverse-v0':
+        tf_env = load_antmaze_large_diverse_v0()
+        eval_tf_env = load_antmaze_large_diverse_v0()
     else:
         raise NotImplementedError('Unsupported environment: %s' % env_name)
     assert len(tf_env.envs) == 1
@@ -698,7 +724,7 @@ class AntMazeBase(locomotion.ant.AntMazeEnv):
         # (chongyiz): concatenate goals to observations
         assert 'infos/goal' in data_dict
         data_dict['observations'] = np.concatenate([
-            data_dict['observations'], data_dict['infos/goal'], np.zeros([N_samples, 2])], axis=-1)
+            data_dict['observations'], data_dict['infos/goal'], np.zeros([N_samples, 27])], axis=-1)
         if self.observation_space.shape is not None:
             assert data_dict['observations'].shape[1:] == self.observation_space.shape, \
                 'Observation shape does not match env: %s vs %s' % (
@@ -724,27 +750,9 @@ class AntMazeBase(locomotion.ant.AntMazeEnv):
 
     def _get_obs(self):
         obs = super(AntMazeBase, self)._get_obs()
-        return np.concatenate([obs, self._target, np.zeros(2)], dtype=np.float32)
+        return np.concatenate([obs, self.target_goal, np.zeros(27)], dtype=np.float32)
 
-# register(
-#     id='antmaze-umaze-diverse-v0',
-#     entry_point='d4rl.locomotion.ant:make_ant_maze_env',
-#     max_episode_steps=700,
-#     kwargs={
-#         'deprecated': True,
-#         'maze_map': maze_env.U_MAZE_TEST,
-#         'reward_type':'sparse',
-#         'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_new/Ant_maze_u-maze_noisy_multistart_True_multigoal_True_sparse.hdf5',
-#         'non_zero_reset':False,
-#         'eval':True,
-#         'maze_size_scaling': 4.0,
-#         'ref_min_score': 0.0,
-#         'ref_max_score': 1.0,
-#     }
-# )
-# def make_ant_maze_env(**kwargs):
-#   env = AntMazeEnv(**kwargs)
-#   return wrappers.NormalizedBoxEnv(env)
+
 class AntMazeUmazeDiverseV0(AntMazeBase):
     def __init__(self,
                  deprecated=True,
@@ -757,6 +765,52 @@ class AntMazeUmazeDiverseV0(AntMazeBase):
                  ref_min_score=0.0,
                  ref_max_score=1.0):
         super(AntMazeUmazeDiverseV0, self).__init__(
+            deprecated=deprecated,
+            maze_map=maze_map,
+            reward_type=reward_type,
+            dataset_url=dataset_url,
+            non_zero_reset=non_zero_reset,
+            eval=eval,
+            maze_size_scaling=maze_size_scaling,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score)
+
+
+class AntMazeMediumDiverseV0(AntMazeBase):
+    def __init__(self,
+                 deprecated=True,
+                 maze_map=locomotion.maze_env.BIG_MAZE_TEST,
+                 reward_type='sparse',
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_new/Ant_maze_big-maze_noisy_multistart_True_multigoal_True_sparse.hdf5',
+                 non_zero_reset=False,
+                 eval=True,
+                 maze_size_scaling=4.0,
+                 ref_min_score=0.0,
+                 ref_max_score=1.0):
+        super(AntMazeMediumDiverseV0, self).__init__(
+            deprecated=deprecated,
+            maze_map=maze_map,
+            reward_type=reward_type,
+            dataset_url=dataset_url,
+            non_zero_reset=non_zero_reset,
+            eval=eval,
+            maze_size_scaling=maze_size_scaling,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score)
+
+
+class AntMazeLargeDiverseV0(AntMazeBase):
+    def __init__(self,
+                 deprecated=True,
+                 maze_map=locomotion.maze_env.HARDEST_MAZE_TEST,
+                 reward_type='sparse',
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_new/Ant_maze_hardest-maze_noisy_multistart_True_multigoal_True_sparse.hdf5',
+                 non_zero_reset=False,
+                 eval=True,
+                 maze_size_scaling=4.0,
+                 ref_min_score=0.0,
+                 ref_max_score=1.0):
+        super(AntMazeLargeDiverseV0, self).__init__(
             deprecated=deprecated,
             maze_map=maze_map,
             reward_type=reward_type,
