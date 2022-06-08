@@ -274,7 +274,7 @@ def train_eval(
         for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
             episode = trajectories.trajectory.from_episode(
                 observation=traj['observations'][..., indices].astype(np.float32), policy_info=(),
-                action=traj['actions'], reward=traj['rewards'])
+                action=traj['actions'].astype(np.float32), reward=traj['rewards'].astype(np.float32))
             replay_buffer.add_episode(episode)
         end_time = time.time()
         logging.info("Time to convert {} frames: {} sec".format(replay_buffer.num_frames(), end_time - start_time))
