@@ -1,7 +1,5 @@
 #!/bin/bash
 
-GPUS=$1
-
 SCRIPT_DIR=$(dirname "$BASH_SOURCE")
 PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
 
@@ -12,7 +10,6 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=$GPUS
   mkdir -p ~/offline_c_learning/c_learning_logs_debug/sawyer_push/$seed
   nohup \
   python $PROJECT_DIR/train_eval.py \
