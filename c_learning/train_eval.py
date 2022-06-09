@@ -297,16 +297,16 @@ def train_eval(
         # train_checkpointer.save(global_step=global_step.numpy())
         # exit()
 
-        # metric_utils.eager_compute(
-        #     eval_metrics,
-        #     eval_tf_env,
-        #     eval_policy,
-        #     num_episodes=num_eval_episodes,
-        #     train_step=global_step,
-        #     summary_writer=eval_summary_writer,
-        #     summary_prefix='Metrics',
-        # )
-        # metric_utils.log_metrics(eval_metrics)
+        metric_utils.eager_compute(
+            eval_metrics,
+            eval_tf_env,
+            eval_policy,
+            num_episodes=num_eval_episodes,
+            train_step=global_step,
+            summary_writer=eval_summary_writer,
+            summary_prefix='Metrics',
+        )
+        metric_utils.log_metrics(eval_metrics)
 
         time_step = None
         policy_state = collect_policy.get_initial_state(tf_env.batch_size)
