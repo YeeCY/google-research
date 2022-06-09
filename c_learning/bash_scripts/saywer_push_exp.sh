@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DATE=$1
+EXP_LABEL=$1
 
 SCRIPT_DIR=$(dirname "$BASH_SOURCE")
 PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
@@ -12,7 +12,7 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
-  mkdir -p ~/offline_c_learning/c_learning_logs/"${DATE}"/sawyer_push/$seed
+  mkdir -p ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/sawyer_push/$seed
   nohup \
   python $PROJECT_DIR/train_eval.py \
     --gin_bindings="train_eval.env_name='sawyer_push'" \
@@ -25,6 +25,6 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="SawyerPush.reset.fix_z=True" \
     --gin_bindings="load_sawyer_push.random_init=True" \
     --gin_bindings="load_sawyer_push.wide_goals=True" \
-    --root_dir ~/offline_c_learning/c_learning_logs/"${DATE}"/sawyer_push/$seed \
-  > ~/offline_c_learning/c_learning_logs/"${DATE}"/sawyer_push/$seed/stream.log 2>&1 &
+    --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/sawyer_push/$seed \
+  > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/sawyer_push/$seed/stream.log 2>&1 &
 done
