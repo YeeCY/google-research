@@ -166,8 +166,8 @@ if __name__ == "__main__":
     parser.add_argument('--fig_save_dir', type=str,
                         default=os.path.join(os.path.dirname(__file__), '../figures'))
     parser.add_argument('--algos', type=str_pair, nargs='+', default=[
-        ('off-policy', 'off-policy/jun9'),
-        ('offline', 'offline/jun9'),
+        ('off-policy', 'off-policy/jun8'),
+        ('offline', 'offline/jun8'),
     ])
     parser.add_argument('--env_name', type=str, default='maze2d_open_v0')
     parser.add_argument('--stats', type=str_pair, nargs='+', default=[

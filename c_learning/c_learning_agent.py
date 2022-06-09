@@ -466,35 +466,35 @@ class CLearningAgent(tf_agent.TFAgent):
                 pred_input, time_steps.step_type, training=training)
 
             # (chongyiz): cross-entropy implementation of the classifier loss
-            # ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
-            # ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
-            # critic_loss = ce_critic_loss1 + ce_critic_loss2
+            ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
+            ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+            critic_loss = ce_critic_loss1 + ce_critic_loss2
 
-            # (chongyiz): three term implementation of the classifier loss,
-            # this implementation is similar to https://github.com/keras-team/keras/blob/v2.9.0/keras/losses.py#L496-L596,
-            # which will be more numerical stable.
-            pred_td_targets1 = tf.clip_by_value(pred_td_targets1, EPSILON, 1. - EPSILON)
-            pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
-            # [1, ..., 1, 0, ..., 0]
-            first_half_batch_mask = next_time_steps.reward
-            first_half_batch_mask = tf.concat([tf.ones(half_batch),
-                                               first_half_batch_mask[half_batch:]], axis=0)
-            # [0, ..., 0, 1, ..., 1]
-            second_half_batch_mask = 1 - next_time_steps.reward
-            second_half_batch_mask = tf.concat([tf.zeros(half_batch),
-                                                second_half_batch_mask[half_batch:]], axis=0)
-            critic_loss1 = -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
-                           second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
-                           second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
-            # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
-            #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
-            critic_loss2 = -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
-                           second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
-                           second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
-            # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
-            #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
-
-            critic_loss = critic_loss1 + critic_loss2
+            # # (chongyiz): three term implementation of the classifier loss,
+            # # this implementation is similar to https://github.com/keras-team/keras/blob/v2.9.0/keras/losses.py#L496-L596,
+            # # which will be more numerical stable.
+            # pred_td_targets1 = tf.clip_by_value(pred_td_targets1, EPSILON, 1. - EPSILON)
+            # pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
+            # # [1, ..., 1, 0, ..., 0]
+            # first_half_batch_mask = next_time_steps.reward
+            # first_half_batch_mask = tf.concat([tf.ones(half_batch),
+            #                                    first_half_batch_mask[half_batch:]], axis=0)
+            # # [0, ..., 0, 1, ..., 1]
+            # second_half_batch_mask = 1 - next_time_steps.reward
+            # second_half_batch_mask = tf.concat([tf.zeros(half_batch),
+            #                                     second_half_batch_mask[half_batch:]], axis=0)
+            # critic_loss1 = -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
+            #                second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
+            #                second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
+            # # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
+            # #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+            # critic_loss2 = -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
+            #                second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
+            #                second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
+            # # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
+            # #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+            #
+            # critic_loss = critic_loss1 + critic_loss2
 
             if critic_loss.shape.rank > 1:
                 # Sum over the time dimension.
