@@ -72,6 +72,7 @@ def vis_policy(
         critic_joint_fc_layers=(256, 256),
         num_episodes=10,
         random_seed=0,
+        actor_std=None,
 ):
     """A simple train and eval for SAC."""
     np.random.seed(random_seed)
@@ -89,10 +90,19 @@ def vis_policy(
     observation_spec = time_step_spec.observation
     action_spec = eval_tf_env.action_spec()
 
+    if actor_std is None:
+        proj_net = tanh_normal_projection_network.TanhNormalProjectionNetwork
+    else:
+        proj_net = functools.partial(
+            tanh_normal_projection_network.TanhNormalProjectionNetwork,
+            std_transform=lambda t: actor_std * tf.ones_like(t))
+
     actor_net = actor_distribution_network.ActorDistributionNetwork(
         observation_spec,
         action_spec,
-        fc_layer_params=actor_fc_layers)
+        fc_layer_params=actor_fc_layers,
+        continuous_projection_net=proj_net)
+
     critic_net = c_learning_utils.ClassifierCriticNetwork(
         (observation_spec, action_spec),
         observation_fc_layer_params=critic_obs_fc_layers,
