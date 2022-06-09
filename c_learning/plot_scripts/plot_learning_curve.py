@@ -69,13 +69,15 @@ def collect_data(root_exp_data_dir, stats, algos, env_name, seeds, max_steps):
                     if idx == 0:
                         algo_data.append(df['Step'].values)
                     if len(df['Value']) < len(algo_data[0]):
-                        algo_data = [data[:len(df['Value'])] in algo_data]
-                    algo_data.append(df['Value'].values)
+                        algo_data = [data[:len(df['Value'])] for data in algo_data]
+                        algo_data.append(df['Value'].values)
+                    else:
+                        algo_data.append(df['Value'].values[:len(algo_data[0])])
                 algo_data = np.asarray(algo_data).T
 
                 # df = pd.concat((pd.read_csv(f) for f in all_csv_paths), ignore_index=True)
             except:
-                print(f"One of CSV paths not found: {all_csv_paths}")
+                print(f"CSV path not found: {csv_path}")
                 continue
 
             # df = df[df['Step'] <= max_steps]
