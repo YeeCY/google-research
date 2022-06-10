@@ -12,6 +12,7 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0)
 
 for seed in "${seeds[@]}"; do
+  rm -rv $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
   mkdir -p ~/offline_c_learning/c_learning_offline_logs_debug/"${EXP_LABEL}"/maze2d_open_v0/$seed
 #  nohup \
   python $PROJECT_DIR/train_eval_offline_d4rl.py \
