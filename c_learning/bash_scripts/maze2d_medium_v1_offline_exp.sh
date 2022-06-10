@@ -1,6 +1,7 @@
 #!/bin/bash
 
 EXP_LABEL=$1
+GPUS=$2
 
 SCRIPT_DIR=$(dirname "$BASH_SOURCE")
 PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
@@ -12,6 +13,7 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
+  export CUDA_VISIBLE_DEVICES=$2
   mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1/$seed
   nohup \
   python $PROJECT_DIR/train_eval_offline_d4rl.py \
