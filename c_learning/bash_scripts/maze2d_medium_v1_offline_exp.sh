@@ -8,6 +8,7 @@ PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco200/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia-000
 export PYTHONPATH=$PROJECT_DIR
+export HDF5_USE_FILE_LOCKING=FALSE
 
 declare -a seeds=(0 1 2)
 
