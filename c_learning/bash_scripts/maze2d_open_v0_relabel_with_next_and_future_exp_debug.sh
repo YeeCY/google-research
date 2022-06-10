@@ -12,7 +12,7 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0)
 
 for seed in "${seeds[@]}"; do
-#  mkdir -p ~/offline_c_learning/c_learning_logs_debug/"${EXP_LABEL}"_relabel_with_next_and_future/maze2d_open_v0/$seed
+  mkdir -p ~/offline_c_learning/c_learning_logs_debug/"${EXP_LABEL}"_relabel_with_next_and_future/maze2d_open_v0/$seed
 #  nohup \
   python $PROJECT_DIR/train_eval.py \
     --gin_bindings="train_eval.env_name='maze2d-open-v0'" \
