@@ -12,7 +12,6 @@ export PYTHONPATH=$PROJECT_DIR
 declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=$GPUS
   mkdir -p ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_umaze_diverse_v0/$seed
   nohup \
   python $PROJECT_DIR/train_eval.py \
