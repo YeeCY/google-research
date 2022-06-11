@@ -407,11 +407,17 @@ class CLearningAgent(tf_agent.TFAgent):
             nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
             # (chongyiz): we are actually using goal-conditioned policy here
+            # Try not to use target network here
             next_actions, _ = self._actions_and_log_probs(next_time_steps)
             target_input = (next_time_steps.observation, next_actions)
-            target_q_values1, unused_network_state1 = self._target_critic_network_1(
+            # target_q_values1, unused_network_state1 = self._target_critic_network_1(
+            #     target_input, next_time_steps.step_type, training=False)
+            # target_q_values2, unused_network_state2 = self._target_critic_network_2(
+            #     target_input, next_time_steps.step_type, training=False)
+            # target_q_values = tf.minimum(target_q_values1, target_q_values2)
+            target_q_values1, _ = self._critic_network_1(
                 target_input, next_time_steps.step_type, training=False)
-            target_q_values2, unused_network_state2 = self._target_critic_network_2(
+            target_q_values2, _ = self._critic_network_2(
                 target_input, next_time_steps.step_type, training=False)
             target_q_values = tf.minimum(target_q_values1, target_q_values2)
 
