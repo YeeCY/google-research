@@ -43,7 +43,6 @@ from tf_agents.utils import eager_utils
 from tf_agents.utils import nest_utils
 from tf_agents.utils import object_identity
 
-
 EPSILON = 1e-7
 CLearningLossInfo = collections.namedtuple(
     'LossInfo', ('critic_loss', 'actor_loss'))
@@ -487,14 +486,16 @@ class CLearningAgent(tf_agent.TFAgent):
             second_half_batch_mask = 1 - next_time_steps.reward
             second_half_batch_mask = tf.concat([tf.zeros(half_batch),
                                                 second_half_batch_mask[half_batch:]], axis=0)
-            critic_loss1 = -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
-                           second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
-                           second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
+            critic_loss1 = \
+                -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
+                second_half_batch_mask * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
+                second_half_batch_mask * tf.stop_gradient(y) * tf.math.log(pred_td_targets1 + EPSILON)
             # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
             #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
-            critic_loss2 = -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
-                           second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
-                           second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
+            critic_loss2 = \
+                -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
+                second_half_batch_mask * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
+                second_half_batch_mask * tf.stop_gradient(y) * tf.math.log(pred_td_targets2 + EPSILON)
             # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
             #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
 
@@ -522,6 +523,34 @@ class CLearningAgent(tf_agent.TFAgent):
             tf.compat.v2.summary.scalar(
                 name='C2 / (1 - C2)',
                 data=tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2)),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='next C1 / (1 - C1)',
+                data=tf.reduce_mean(pred_td_targets1[:num_next] / (1 - pred_td_targets1[:num_next])),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='next C2 / (1 - C2)',
+                data=tf.reduce_mean(pred_td_targets2[:num_next] / (1 - pred_td_targets2[:num_next])),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='future C1 / (1 - C1)',
+                data=tf.reduce_mean(
+                    pred_td_targets1[num_next:num_next + num_future] /
+                    (1 - pred_td_targets1[num_next:num_next + num_future])),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='future C2 / (1 - C2)',
+                data=tf.reduce_mean(
+                    pred_td_targets2[num_next:num_next + num_future] /
+                    (1 - pred_td_targets2[num_next:num_next + num_future])),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='random C1 / (1 - C1)',
+                data=tf.reduce_mean(pred_td_targets1[half_batch:] / (1 - pred_td_targets1[half_batch:])),
+                step=self.train_step_counter)
+            tf.compat.v2.summary.scalar(
+                name='random C2 / (1 - C2)',
+                data=tf.reduce_mean(pred_td_targets2[half_batch:] / (1 - pred_td_targets2[half_batch:])),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='C1 / (1 - C1) is NAN',
