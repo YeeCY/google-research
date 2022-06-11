@@ -24,6 +24,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="goal_fn.relabel_next_prob=0.5" \
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --gin_bindings="critic_loss.w_clipping=-1" \
+    --gin_bindings="actor_loss.ce_loss=True" \
     --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_no_w_clipping/maze2d_umaze_v1/$seed \
   > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_no_w_clipping/maze2d_umaze_v1/$seed/stream.log 2>&1 &
 done
