@@ -13,7 +13,7 @@ export HDF5_USE_FILE_LOCKING=FALSE
 declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
-  mkdir -p ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_no_w_clipping/maze2d_umaze_v1/$seed
+  mkdir -p ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_horizon_w_clipping/maze2d_umaze_v1/$seed
   nohup \
   python $PROJECT_DIR/train_eval.py \
     --gin_bindings="train_eval.env_name='maze2d-umaze-v1'" \
@@ -24,6 +24,6 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="goal_fn.relabel_next_prob=0.5" \
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --gin_bindings="critic_loss.w_clipping=300" \
-    --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_no_w_clipping/maze2d_umaze_v1/$seed \
-  > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_no_w_clipping/maze2d_umaze_v1/$seed/stream.log 2>&1 &
+    --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_horizon_w_clipping/maze2d_umaze_v1/$seed \
+  > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"_horizon_w_clipping/maze2d_umaze_v1/$seed/stream.log 2>&1 &
 done
