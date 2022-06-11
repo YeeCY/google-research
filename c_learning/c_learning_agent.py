@@ -421,7 +421,8 @@ class CLearningAgent(tf_agent.TFAgent):
                 w = tf.clip_by_value(w, 0, w_clipping)
             else:
                 # w = tf.clip_by_value(w, 0, 1e30)
-                w = tf.clip_by_value(w, 0, tf.float32.max)
+                w = tf.clip_by_value(w, 0, 1e25)
+                # w = tf.clip_by_value(w, 0, tf.float32.max)
             tf.debugging.assert_all_finite(w, 'Not all elements of w are finite')
             if self_normalized:
                 w = w / tf.reduce_mean(w)
