@@ -14,16 +14,16 @@ declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
-  mkdir -p ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_medium_diverse_v0/$seed
+  mkdir -p ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_medium_diverse_v2/$seed
   nohup \
   python $PROJECT_DIR/train_eval.py \
-    --gin_bindings="train_eval.env_name='antmaze-medium-diverse-v0'" \
+    --gin_bindings="train_eval.env_name='antmaze-medium-diverse-v2'" \
     --gin_bindings="train_eval.random_seed=${seed}" \
-    --gin_bindings="train_eval.num_iterations=2000000" \
+    --gin_bindings="train_eval.num_iterations=1000000" \
     --gin_bindings="obs_to_goal.start_index=0" \
     --gin_bindings="obs_to_goal.end_index=2" \
     --gin_bindings="goal_fn.relabel_next_prob=0.3" \
     --gin_bindings="goal_fn.relabel_future_prob=0.2" \
-    --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_medium_diverse_v0/$seed \
-  > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_medium_diverse_v0/$seed/stream.log 2>&1 &
+    --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_medium_diverse_v2/$seed \
+  > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_medium_diverse_v2/$seed/stream.log 2>&1 &
 done
