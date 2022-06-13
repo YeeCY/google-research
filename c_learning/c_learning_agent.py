@@ -408,18 +408,19 @@ class CLearningAgent(tf_agent.TFAgent):
 
             # (chongyiz): we are actually using goal-conditioned policy here
             # Try not to use target network here
+            # TODO (chongyiz): check the classifier input
             next_actions, _ = self._actions_and_log_probs(next_time_steps)
             target_input = (next_time_steps.observation, next_actions)
-            # target_q_values1, unused_network_state1 = self._target_critic_network_1(
-            #     target_input, next_time_steps.step_type, training=False)
-            # target_q_values2, unused_network_state2 = self._target_critic_network_2(
-            #     target_input, next_time_steps.step_type, training=False)
-            # target_q_values = tf.minimum(target_q_values1, target_q_values2)
-            target_q_values1, _ = self._critic_network_1(
+            target_q_values1, _ = self._target_critic_network_1(
                 target_input, next_time_steps.step_type, training=False)
-            target_q_values2, _ = self._critic_network_2(
+            target_q_values2, _ = self._target_critic_network_2(
                 target_input, next_time_steps.step_type, training=False)
             target_q_values = tf.minimum(target_q_values1, target_q_values2)
+            # target_q_values1, _ = self._critic_network_1(
+            #     target_input, next_time_steps.step_type, training=False)
+            # target_q_values2, _ = self._critic_network_2(
+            #     target_input, next_time_steps.step_type, training=False)
+            # target_q_values = tf.minimum(target_q_values1, target_q_values2)
 
             w = tf.stop_gradient(target_q_values / (1 - target_q_values))
             if w_clipping >= 0:
