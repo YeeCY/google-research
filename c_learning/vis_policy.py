@@ -120,9 +120,9 @@ def vis_policy(
         agent=tf_agent)
 
     train_checkpointer.initialize_or_restore()
-    # eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
-    eval_policy = random_tf_policy.RandomTFPolicy(
-        eval_tf_env.time_step_spec(), eval_tf_env.action_spec())
+    eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
+    # eval_policy = random_tf_policy.RandomTFPolicy(
+    #     eval_tf_env.time_step_spec(), eval_tf_env.action_spec())
 
     video_path = os.path.join(save_dir, video_filename)
     with imageio.get_writer(video_path, fps=60) as video:
