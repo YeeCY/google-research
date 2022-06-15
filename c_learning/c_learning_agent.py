@@ -417,6 +417,8 @@ class CLearningAgent(tf_agent.TFAgent):
             end_index = gin.query_parameter('obs_to_goal.end_index')
             mask = np.zeros(list(next_time_steps.observation.shape), dtype=np.float32)
             mask[..., start_index:end_index] = 1
+            mask[..., -(end_index - start_index):] = 1
+            # mask[..., obs_dim]
             mask = tf.convert_to_tensor(mask)
             # mask = tf.zeros_like(next_time_steps.observation)
             # mask[..., start_index:end_index].assign(
@@ -623,6 +625,7 @@ class CLearningAgent(tf_agent.TFAgent):
             end_index = gin.query_parameter('obs_to_goal.end_index')
             mask = np.zeros(list(time_steps.observation.shape), dtype=np.float32)
             mask[..., start_index:end_index] = 1
+            mask[..., -(end_index - start_index):] = 1
             mask = tf.convert_to_tensor(mask)
 
             target_input = (time_steps.observation * mask, sampled_actions)
