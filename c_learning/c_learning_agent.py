@@ -28,6 +28,7 @@ from typing import Callable, Optional, Text
 
 import gin
 from six.moves import zip
+import numpy as np
 import tensorflow as tf  # pylint: disable=g-explicit-tensorflow-version-import
 import tensorflow_probability as tfp
 
@@ -410,7 +411,21 @@ class CLearningAgent(tf_agent.TFAgent):
             # Try not to use target network here
             # TODO (chongyiz): check the classifier input
             next_actions, _ = self._actions_and_log_probs(next_time_steps)
-            target_input = (next_time_steps.observation, next_actions)
+
+            # TODO (chongyiz): trying to zero out observations other than states for classifer
+            start_index = gin.query_parameter('obs_to_goal.start_index')
+            end_index = gin.query_parameter('obs_to_goal.end_index')
+            mask = np.zeros(list(next_time_steps.observation.shape), dtype=np.float32)
+            mask[..., start_index:end_index] = 1
+            mask = tf.convert_to_tensor(mask)
+            # mask = tf.zeros_like(next_time_steps.observation)
+            # mask[..., start_index:end_index].assign(
+            #     tf.ones([
+            #         nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0],
+            #         end_index - start_index])
+            # )
+
+            target_input = (next_time_steps.observation * mask, next_actions)
             target_q_values1, _ = self._target_critic_network_1(
                 target_input, next_time_steps.step_type, training=False)
             target_q_values2, _ = self._target_critic_network_2(
@@ -469,7 +484,7 @@ class CLearningAgent(tf_agent.TFAgent):
                                         td_targets[half_batch:]], axis=0)
 
             observation = time_steps.observation
-            pred_input = (observation, actions)
+            pred_input = (observation * mask, actions)
             pred_td_targets1, _ = self._critic_network_1(
                 pred_input, time_steps.step_type, training=training)
             pred_td_targets2, _ = self._critic_network_2(
@@ -602,7 +617,15 @@ class CLearningAgent(tf_agent.TFAgent):
             nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
             sampled_actions, log_pi = self._actions_and_log_probs(time_steps)
-            target_input = (time_steps.observation, sampled_actions)
+
+            # TODO (chongyiz): trying to zero out observations other than states for classifer
+            start_index = gin.query_parameter('obs_to_goal.start_index')
+            end_index = gin.query_parameter('obs_to_goal.end_index')
+            mask = np.zeros(list(time_steps.observation.shape), dtype=np.float32)
+            mask[..., start_index:end_index] = 1
+            mask = tf.convert_to_tensor(mask)
+
+            target_input = (time_steps.observation * mask, sampled_actions)
             q_values1, _ = self._critic_network_1(
                 target_input, time_steps.step_type, training=False)
             q_values2, _ = self._critic_network_2(
