@@ -117,7 +117,6 @@ def vis_policy(
         actor_optimizer=None,
         critic_optimizer=None,
     )
-    tf_agent.initialize()
 
     # load learned agent
     train_checkpointer = common.Checkpointer(
