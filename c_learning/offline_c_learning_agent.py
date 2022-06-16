@@ -435,21 +435,14 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             next_log_pi = self._log_probs(next_time_steps, next_actions)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
-            start_index = gin.query_parameter('obs_to_goal.start_index')
-            end_index = gin.query_parameter('obs_to_goal.end_index')
-            mask = np.zeros(list(next_time_steps.observation.shape), dtype=np.float32)
-            mask[..., start_index:end_index] = 1
-            mask[..., -(end_index - start_index):] = 1
-            # mask[..., obs_dim]
-            mask = tf.convert_to_tensor(mask)
-            # mask = tf.zeros_like(next_time_steps.observation)
-            # mask[..., start_index:end_index].assign(
-            #     tf.ones([
-            #         nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0],
-            #         end_index - start_index])
-            # )
+            # start_index = gin.query_parameter('obs_to_goal.start_index')
+            # end_index = gin.query_parameter('obs_to_goal.end_index')
+            # mask = np.zeros(list(next_time_steps.observation.shape), dtype=np.float32)
+            # mask[..., start_index:end_index] = 1
+            # mask[..., -(end_index - start_index):] = 1
+            # mask = tf.convert_to_tensor(mask)
 
-            target_input = (next_time_steps.observation * mask, next_actions)
+            target_input = (next_time_steps.observation, next_actions)
             target_q_values1, _ = self._target_critic_network_1(
                 target_input, next_time_steps.step_type, training=False)
             target_q_values2, _ = self._target_critic_network_2(
@@ -518,14 +511,14 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             #                             td_targets[half_batch:]], axis=0)
 
             observation = time_steps.observation
-            pred_pos_input = (observation * mask, actions)
+            pred_pos_input = (observation, actions)
             pred_td_pos_targets1, _ = self._critic_network_1(
                 pred_pos_input, time_steps.step_type, training=training)
             pred_td_pos_targets2, _ = self._critic_network_2(
                 pred_pos_input, time_steps.step_type, training=training)
 
             neg_actions, _ = self._actions_and_log_probs(time_steps)
-            pred_neg_input = (observation * mask, neg_actions)
+            pred_neg_input = (observation, neg_actions)
             pred_td_neg_targets1, _ = self._critic_network_1(
                 pred_neg_input, time_steps.step_type, training=training)
             pred_td_neg_targets2, _ = self._critic_network_2(
@@ -584,44 +577,44 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             tf.compat.v2.summary.scalar(
                 name='C1 / (1 - C1)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets1 / (1 - pred_pos_td_targets1)),
+                    pred_td_pos_targets1 / (1 - pred_td_pos_targets1)),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='C2 / (1 - C2)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets2 / (1 - pred_pos_td_targets2)),
+                    pred_td_pos_targets2 / (1 - pred_td_pos_targets2)),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='next C1 / (1 - C1)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets1[:num_next] / (1 - pred_pos_td_targets1[:num_next])),
+                    pred_td_pos_targets1[:num_next] / (1 - pred_td_pos_targets1[:num_next])),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='next C2 / (1 - C2)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets2[:num_next] / (1 - pred_pos_td_targets2[:num_next])),
+                    pred_td_pos_targets2[:num_next] / (1 - pred_td_pos_targets2[:num_next])),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='future C1 / (1 - C1)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets1[num_next:num_next + num_future] /
-                    (1 - pred_pos_td_targets1[num_next:num_next + num_future])),
+                    pred_td_pos_targets1[num_next:num_next + num_future] /
+                    (1 - pred_td_pos_targets1[num_next:num_next + num_future])),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='future C2 / (1 - C2)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets2[num_next:num_next + num_future] /
-                    (1 - pred_pos_td_targets2[num_next:num_next + num_future])),
+                    pred_td_pos_targets2[num_next:num_next + num_future] /
+                    (1 - pred_td_pos_targets2[num_next:num_next + num_future])),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='random C1 / (1 - C1)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets1[half_batch:] / (1 - pred_pos_td_targets1[half_batch:])),
+                    pred_td_pos_targets1[half_batch:] / (1 - pred_td_pos_targets1[half_batch:])),
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='random C2 / (1 - C2)',
                 data=tf.reduce_mean(
-                    pred_pos_td_targets2[half_batch:] / (1 - pred_pos_td_targets2[half_batch:])),
+                    pred_td_pos_targets2[half_batch:] / (1 - pred_td_pos_targets2[half_batch:])),
                 step=self.train_step_counter)
             # tf.compat.v2.summary.scalar(
             #     name='C1 / (1 - C1) is NAN',
@@ -668,14 +661,14 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             sampled_actions, log_pi = self._actions_and_log_probs(time_steps)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
-            start_index = gin.query_parameter('obs_to_goal.start_index')
-            end_index = gin.query_parameter('obs_to_goal.end_index')
-            mask = np.zeros(list(time_steps.observation.shape), dtype=np.float32)
-            mask[..., start_index:end_index] = 1
-            mask[..., -(end_index - start_index):] = 1
-            mask = tf.convert_to_tensor(mask)
+            # start_index = gin.query_parameter('obs_to_goal.start_index')
+            # end_index = gin.query_parameter('obs_to_goal.end_index')
+            # mask = np.zeros(list(time_steps.observation.shape), dtype=np.float32)
+            # mask[..., start_index:end_index] = 1
+            # mask[..., -(end_index - start_index):] = 1
+            # mask = tf.convert_to_tensor(mask)
 
-            target_input = (time_steps.observation * mask, sampled_actions)
+            target_input = (time_steps.observation, sampled_actions)
             q_values1, _ = self._critic_network_1(
                 target_input, time_steps.step_type, training=False)
             q_values2, _ = self._critic_network_2(
