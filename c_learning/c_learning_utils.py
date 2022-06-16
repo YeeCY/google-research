@@ -189,6 +189,94 @@ def goal_fn(experience,
 
 
 @gin.configurable
+def offline_goal_fn(experience,
+                    buffer_info,
+                    relabel_orig_prob=0.0,
+                    relabel_next_prob=0.5,
+                    relabel_future_prob=0.0,
+                    relabel_last_prob=0.0,
+                    batch_size=None,
+                    obs_dim=None,
+                    gamma=None):
+    """Given experience, sample goals in three ways.
+
+    The three ways are using the next state, an arbitrary future state, or a
+    random state. For the future state relabeling, care must be taken to ensure
+    that we don't sample experience across the episode boundary. We automatically
+    set relabel_random_prob = (1 - relabel_next_prob - relabel_future_prob).
+
+    Args:
+      experience: The experience that we aim to relabel.
+      buffer_info: Information about the replay buffer. We will not change this.
+      relabel_orig_prob: (float) Fraction of experience to not relabel.
+      relabel_next_prob: (float) Fraction of experience to relabel with the next
+        state.
+      relabel_future_prob: (float) Fraction of experience to relabel with a future
+        state.
+      relabel_last_prob: (float) Fraction of experience to relabel with the
+        final state.
+      batch_size: (int) The size of the batch.
+      obs_dim: (int) The dimension of the observation.
+      gamma: (float) The discount factor. Future states are sampled according to
+        a Geom(1 - gamma) distribution.
+    Returns:
+      experience: A modified version of the input experience where the goals
+        have been changed and the rewards and terminal flags are recomputed.
+      buffer_info: Information about the replay buffer.
+
+    """
+    assert batch_size is not None
+    assert obs_dim is not None
+    assert gamma is not None
+    relabel_orig_num = int(relabel_orig_prob * batch_size)
+    relabel_next_num = int(relabel_next_prob * batch_size)
+    relabel_future_num = int(relabel_future_prob * batch_size)
+    relabel_last_num = int(relabel_last_prob * batch_size)
+    relabel_random_num = batch_size - (
+            relabel_orig_num + relabel_next_num + relabel_future_num +
+            relabel_last_num)
+    assert relabel_random_num >= 0
+
+    orig_goals = experience.observation[:relabel_orig_num, 0, obs_dim:]
+
+    index = relabel_orig_num
+    next_goals = experience.observation[index:index + relabel_next_num,
+                 1, :obs_dim]
+
+    index = relabel_orig_num + relabel_next_num
+    future_goals = get_future_goals(
+        experience.observation[index:index + relabel_future_num, :, :obs_dim],
+        experience.discount[index:index + relabel_future_num], gamma)
+
+    index = relabel_orig_num + relabel_next_num + relabel_future_num
+    last_goals = get_last_goals(
+        experience.observation[index:index + relabel_last_num, :, :obs_dim],
+        experience.discount[index:index + relabel_last_num])
+
+    # For random goals we take other states from the same batch.
+    random_goals = tf.random.shuffle(experience.observation[:relabel_random_num,
+                                     0, :obs_dim])
+    new_goals = obs_to_goal(tf.concat([next_goals, future_goals,
+                                       last_goals, random_goals], axis=0))
+    goals = tf.concat([orig_goals, new_goals], axis=0)
+
+    obs = experience.observation[:, :2, :obs_dim]
+    reward = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
+    reward = tf.cast(reward, tf.float32)
+    reward = tf.tile(reward[:, None], [1, 2])
+    new_obs = tf.concat([obs, tf.tile(goals[:, None, :], [1, 2, 1])], axis=2)
+    experience = experience.replace(
+        observation=new_obs,  # [B x 2 x 2 * obs_dim]
+        action=experience.action[:, :2],
+        step_type=experience.step_type[:, :2],
+        next_step_type=experience.next_step_type[:, :2],
+        discount=experience.discount[:, :2],
+        reward=reward,
+    )
+    return experience, buffer_info
+
+
+@gin.configurable
 class ClassifierCriticNetwork(critic_network.CriticNetwork):
     """Creates a critic network."""
 

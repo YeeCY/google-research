@@ -27,6 +27,7 @@ from absl import app
 from absl import flags
 from absl import logging
 import c_learning_agent
+import offline_c_learning_agent
 import c_learning_envs
 import c_learning_utils
 import gin
@@ -150,7 +151,24 @@ def train_eval(
             kernel_initializer='glorot_uniform',
             last_kernel_initializer='glorot_uniform')
 
-        tf_agent = c_learning_agent.CLearningAgent(
+        # tf_agent = c_learning_agent.CLearningAgent(
+        #     time_step_spec,
+        #     action_spec,
+        #     actor_network=actor_net,
+        #     critic_network=critic_net,
+        #     actor_optimizer=tf.compat.v1.train.AdamOptimizer(
+        #         learning_rate=actor_learning_rate),
+        #     critic_optimizer=tf.compat.v1.train.AdamOptimizer(
+        #         learning_rate=critic_learning_rate),
+        #     target_update_tau=target_update_tau,
+        #     target_update_period=target_update_period,
+        #     td_errors_loss_fn=bce_loss,
+        #     gamma=gamma,
+        #     gradient_clipping=gradient_clipping,
+        #     debug_summaries=debug_summaries,
+        #     summarize_grads_and_vars=summarize_grads_and_vars,
+        #     train_step_counter=global_step)
+        tf_agent = offline_c_learning_agent.OfflineCLearningAgent(
             time_step_spec,
             action_spec,
             actor_network=actor_net,
@@ -355,7 +373,7 @@ def train_eval(
             # initial_collect_driver.run = common.function(initial_collect_driver.run)
             # collect_driver.run = common.function(collect_driver.run)
             tf_agent.train = common.function(tf_agent.train)
-            # c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
+            c_learning_utils.offline_goal_fn = common.function(c_learning_utils.offline_goal_fn)
 
         # Save the hyperparameters
         operative_filename = os.path.join(root_dir, 'operative.gin')
@@ -371,16 +389,16 @@ def train_eval(
         #     initial_collect_driver.run()
         assert replay_buffer.num_frames() > 0, "Restore an empty replay buffer!"
 
-        metric_utils.eager_compute(
-            eval_metrics,
-            eval_tf_env,
-            eval_policy,
-            num_episodes=num_eval_episodes,
-            train_step=global_step,
-            summary_writer=eval_summary_writer,
-            summary_prefix='Metrics',
-        )
-        metric_utils.log_metrics(eval_metrics)
+        # metric_utils.eager_compute(
+        #     eval_metrics,
+        #     eval_tf_env,
+        #     eval_policy,
+        #     num_episodes=num_eval_episodes,
+        #     train_step=global_step,
+        #     summary_writer=eval_summary_writer,
+        #     summary_prefix='Metrics',
+        # )
+        # metric_utils.log_metrics(eval_metrics)
 
         # time_step = None
         # policy_state = collect_policy.get_initial_state(tf_env.batch_size)
@@ -396,12 +414,12 @@ def train_eval(
             num_steps=max_future_steps)
         dataset = dataset.unbatch().filter(_filter_invalid_transition)
         dataset = dataset.batch(batch_size, drop_remainder=True)
-        goal_fn = functools.partial(
-            c_learning_utils.goal_fn,
+        offline_goal_fn = functools.partial(
+            c_learning_utils.offline_goal_fn,
             batch_size=batch_size,
             obs_dim=obs_dim,
             gamma=gamma)
-        dataset = dataset.map(goal_fn)
+        dataset = dataset.map(offline_goal_fn)
         dataset = dataset.prefetch(5)
         iterator = iter(dataset)
 
