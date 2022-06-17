@@ -74,7 +74,6 @@ def bce_loss(y_true, y_pred, label_smoothing=0):
 @gin.configurable
 def train_eval_offline(
         root_dir,
-        dataset_dir,
         env_name='sawyer_reach',
         num_iterations=3000000,
         actor_fc_layers=(256, 256),
