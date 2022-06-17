@@ -27,10 +27,12 @@ from absl import app
 from absl import flags
 from absl import logging
 import c_learning_agent
+import offline_c_learning_agent
 import c_learning_envs
 import c_learning_utils
 import gin
 import numpy as np
+import d4rl
 from six.moves import range
 import tensorflow as tf  # pylint: disable=g-explicit-tensorflow-version-import
 from tf_agents.agents.sac import tanh_normal_projection_network
@@ -40,8 +42,13 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.networks import actor_distribution_network
 from tf_agents.policies import greedy_policy
 from tf_agents.policies import random_tf_policy
-from tf_agents.replay_buffers import tf_uniform_replay_buffer
+# from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.utils import common
+from tf_agents import trajectories
+from tf_agents.trajectories import time_step as ts
+from tf_agents.trajectories import policy_step as ps
+from tf_agents.utils import nest_utils
+
 
 # limit gpu memory usage
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -50,8 +57,6 @@ for gpu in gpus:
 
 flags.DEFINE_string('root_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
                     'Root directory for writing logs/summaries/checkpoints.')
-flags.DEFINE_string('dataset_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
-                    'Directory for restoring replay buffer from pre-trained agent')
 flags.DEFINE_bool('run_eagerly', False, 'Enables / disables eager execution of tf.functions.')
 flags.DEFINE_multi_string('gin_file', None, 'Path to the trainer config files.')
 flags.DEFINE_multi_string('gin_bindings', None, 'Gin binding to pass through.')
@@ -67,7 +72,7 @@ def bce_loss(y_true, y_pred, label_smoothing=0):
 
 
 @gin.configurable
-def train_eval(
+def train_eval_offline(
         root_dir,
         dataset_dir,
         env_name='sawyer_reach',
@@ -111,7 +116,6 @@ def train_eval(
     tf.random.set_seed(random_seed)
 
     root_dir = os.path.expanduser(root_dir)
-    dataset_dir = os.path.expanduser(dataset_dir)
     train_dir = os.path.join(root_dir, 'train')
     eval_dir = os.path.join(root_dir, 'eval')
 
@@ -178,7 +182,6 @@ def train_eval(
             c_learning_utils.DeltaDistance(
                 buffer_size=num_eval_episodes, obs_dim=obs_dim),
         ]
-        # TODO (chongyiz): fix train_metrics bugs
         train_metrics = [
             tf_metrics.NumberOfEpisodes(),
             tf_metrics.EnvironmentSteps(),
@@ -250,15 +253,82 @@ def train_eval(
         # train_checkpointer.initialize_or_restore()
 
         # (chongyiz): restore replay buffer
-        replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
+        replay_buffer = c_learning_utils.TFUniformReplayBuffer(
             data_spec=tf_agent.collect_data_spec,
             batch_size=tf_env.batch_size,
             max_length=replay_buffer_capacity)
 
-        replay_buffer_checkpointer = common.Checkpointer(
-            ckpt_dir=dataset_dir,
-            replay_buffer=replay_buffer)
-        replay_buffer_checkpointer.initialize_or_restore()
+        # TODO (chongyiz): construct offline dataset
+        try:
+            start_index = gin.query_parameter('obs_to_goal.start_index')
+        except ValueError:
+            start_index = 0
+        try:
+            end_index = gin.query_parameter('obs_to_goal.end_index')
+        except ValueError:
+            end_index = obs_dim
+        indices = np.concatenate([
+            np.arange(obs_dim),
+            np.arange(obs_dim + start_index, obs_dim + end_index)
+        ])
+        import time
+        start_time = time.time()
+        for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
+            episode = trajectories.trajectory.from_episode(
+                observation=traj['observations'][..., indices].astype(np.float32), policy_info=(),
+                action=traj['actions'].astype(np.float32), reward=traj['rewards'].astype(np.float32))
+            replay_buffer.add_episode(episode)
+        end_time = time.time()
+        logging.info("Time to convert {} frames: {} sec".format(replay_buffer.num_frames(), end_time - start_time))
+
+        # ts.restart(observation)
+        # observation, reward, self._done, self._info = self._gym_env.step(action)
+        #
+        # if self._match_obs_space_dtype:
+        #     observation = self._to_obs_space_dtype(observation)
+        #
+        # if self._done:
+        #     return ts.termination(observation, reward)
+        # else:
+        #     return ts.transition(observation, reward, self._discount)
+        # try:
+        #     start_index = gin.query_parameter('obs_to_goal.start_index')
+        # except ValueError:
+        #     start_index = 0
+        # try:
+        #     end_index = gin.query_parameter('obs_to_goal.end_index')
+        # except ValueError:
+        #     end_index = obs_dim
+        # indices = np.concatenate([
+        #     np.arange(obs_dim),
+        #     np.arange(obs_dim + start_index, obs_dim + end_index)
+        # ])
+
+        # dataset = tf_env.pyenv.envs[0].get_dataset()
+        # for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
+            # ts.restart(traj[0])
+        # transitions = []
+        # start_time = time.time()
+        # for obs, action, reward, terminal in zip(
+        #         dataset['observations'], dataset['actions'], dataset['rewards'], dataset['terminals']):
+        #     if terminal:
+        #         transition = trajectories.trajectory.last(
+        #             obs[indices], action, (), reward, 1.0)
+        #     else:
+        #         transition = trajectories.trajectory.mid(
+        #             obs[indices], action, (), reward, 1.0)
+        #
+        #     transition = nest_utils.batch_nested_array(transition)
+        #     transitions.append(transition)
+        #     replay_buffer.add_batch(transition)
+        # end_time = time.time()
+        # print("Time to convert {} frames: {}".format(replay_buffer.num_frames(), end_time - start_time))
+        # exit()
+
+        # replay_buffer_checkpointer = common.Checkpointer(
+        #     ckpt_dir=dataset_dir,
+        #     replay_buffer=replay_buffer)
+        # replay_buffer_checkpointer.initialize_or_restore()
 
         # create train checkpointer
         train_checkpointer = common.Checkpointer(
@@ -396,8 +466,7 @@ def main(_):
     logging.set_verbosity(logging.INFO)
     gin.parse_config_files_and_bindings(FLAGS.gin_file, FLAGS.gin_bindings)
     root_dir = FLAGS.root_dir
-    dataset_dir = FLAGS.dataset_dir
-    train_eval(root_dir, dataset_dir)
+    train_eval_offline(root_dir)
 
 
 if __name__ == '__main__':
