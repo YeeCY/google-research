@@ -217,6 +217,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
         Copies weights from the Q networks to the target Q network.
         """
+        self._behavioral_cloning_agent.initialize()
+
         common.soft_variables_update(
             self._critic_network_1.variables,
             self._target_critic_network_1.variables,
@@ -401,11 +403,6 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                                              self.action_spec)
 
         return log_pi, log_pi_beta
-
-    def initialize(self):
-        self._behavioral_cloning_agent.initialize()
-
-        super().initialize()
 
     @gin.configurable
     def critic_loss(self,
