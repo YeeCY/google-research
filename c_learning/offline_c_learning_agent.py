@@ -421,6 +421,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                     self_normalized=False,
                     lambda_fix=False,
                     policy_ratio=False,
+                    policy_log_ratio_clip_min=-12,
+                    policy_log_ratio_clip_max=3,
                     # sarsa=False,
                     ):
         """Computes the critic loss for C-learning training.
@@ -489,8 +491,17 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             if policy_ratio:
                 # ratio = (next_log_pi / next_log_pi_beta) ** 2
                 # raise NotImplementedError("Haven't implement policy ratio yet!")
-                ratio = (next_log_pi / next_log_pi_beta) ** 2
+                log_ratio = tf.clip_by_value(
+                    2 * (next_log_pi - next_log_pi_beta),
+                    policy_log_ratio_clip_min,
+                    policy_log_ratio_clip_max)
+                ratio = tf.math.exp(log_ratio)
                 w = tf.stop_gradient(ratio * target_q_values / (1 - target_q_values))
+
+                tf.compat.v2.summary.scalar(
+                    name='next_pi / next_pi_beta',
+                    data=tf.reduce_mean(ratio),
+                    step=self.train_step_counter)
             else:
                 # SARSA
                 w = tf.stop_gradient(target_q_values / (1 - target_q_values))
