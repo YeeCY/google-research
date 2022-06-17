@@ -721,7 +721,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             q_values = tf.minimum(q_values1, q_values2)
             if ce_loss:
                 actor_loss = tf.keras.losses.binary_crossentropy(
-                    tf.ones_like(q_values), q_values) + tf.keras.losses.binary_crossentropy(
+                    tf.ones_like(q_values), q_values) - tf.keras.losses.binary_crossentropy(
                     tf.zeros_like(q_values), 1 - q_values)
             else:
                 actor_loss = -1.0 * q_values / (1 - q_values)

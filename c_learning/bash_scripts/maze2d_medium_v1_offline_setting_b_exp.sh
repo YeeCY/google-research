@@ -26,6 +26,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="offline_goal_fn.relabel_next_prob=0.3" \
     --gin_bindings="offline_goal_fn.relabel_next_future_prob=0.2" \
     --gin_bindings="offline_goal_fn.setting='b'" \
+    --gin_bindings="offline_c_learning_agent.actor_loss.ce_loss=True" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1/$seed \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1/$seed/stream.log 2>&1 & \
   sleep 2
