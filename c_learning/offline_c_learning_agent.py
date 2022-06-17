@@ -59,6 +59,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
     def __init__(self,
                  time_step_spec,
                  action_spec,
+                 behavioral_cloning_agent,
                  critic_network,
                  actor_network,
                  actor_optimizer,
@@ -135,6 +136,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         tf.Module.__init__(self, name=name)
 
         self._check_action_spec(action_spec)
+
+        self._behavioral_cloning_agent = behavioral_cloning_agent
 
         self._critic_network_1 = critic_network
         self._critic_network_1.create_variables()
@@ -246,6 +249,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         actions = policy_steps.action
         next_actions = experience.action[:, -1]
 
+        # TODO (chongyiz): train the behavioral cloning agent
+        behavioral_cloning_loss_info = self._behavioral_cloning_agent.train(
+            trajectory.from_transition(time_steps, policy_steps, next_time_steps))
+
         trainable_critic_variables = list(object_identity.ObjectIdentitySet(
             self._critic_network_1.trainable_variables +
             self._critic_network_2.trainable_variables))
@@ -282,6 +289,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                               self._actor_optimizer)
 
         with tf.name_scope('Losses'):
+            tf.compat.v2.summary.scalar(
+                name="behavioral_cloning_loss", data=behavioral_cloning_loss_info.loss,
+                step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='critic_loss', data=critic_loss, step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
@@ -373,13 +383,29 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         policy_state = self._train_policy.get_initial_state(batch_size)
         action_distribution = self._train_policy.distribution(
             time_steps, policy_state=policy_state).action
+        
+        cloning_network = self._behavioral_cloning_agent.cloning_network
+        cloning_network_state = cloning_network.get_initial_state(
+            batch_size)
+        behavioral_cloning_action_distribution, _ = cloning_network(
+            time_steps.observation,
+            step_type=time_steps.step_type,
+            training=False,
+            network_state=cloning_network_state)
 
         # Get log_pis from transformed distribution.
         # actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
         log_pi = common.log_probability(action_distribution, actions,
                                         self.action_spec)
+        log_pi_beta = common.log_probability(behavioral_cloning_action_distribution, actions,
+                                             self.action_spec)
 
-        return log_pi
+        return log_pi, log_pi_beta
+
+    def initialize(self):
+        self._behavioral_cloning_agent.initialize()
+
+        super().initialize()
 
     @gin.configurable
     def critic_loss(self,
@@ -437,7 +463,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             # Try not to use target network here
             # TODO (chongyiz): check the classifier input
             # next_actions, next_log_pi = self._actions_and_log_probs(next_time_steps)
-            next_log_pi = self._log_probs(next_time_steps, next_actions)
+            next_log_pi, next_log_pi_beta = self._log_probs(next_time_steps, next_actions)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
             # start_index = gin.query_parameter('obs_to_goal.start_index')
@@ -461,8 +487,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
             # TODO (chongyiz): implement policy ratio
             if policy_ratio:
-                # ratio = next_log_pi / next_log_pi_beta
-                raise NotImplementedError("Haven't implement policy ratio yet!")
+                # ratio = (next_log_pi / next_log_pi_beta) ** 2
+                # raise NotImplementedError("Haven't implement policy ratio yet!")
+                ratio = (next_log_pi / next_log_pi_beta) ** 2
+                w = tf.stop_gradient(ratio * target_q_values / (1 - target_q_values))
             else:
                 # SARSA
                 w = tf.stop_gradient(target_q_values / (1 - target_q_values))

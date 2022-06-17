@@ -36,6 +36,7 @@ import d4rl
 from six.moves import range
 import tensorflow as tf  # pylint: disable=g-explicit-tensorflow-version-import
 from tf_agents.agents.sac import tanh_normal_projection_network
+from tf_agents.agents.behavioral_cloning import behavioral_cloning_agent
 from tf_agents.drivers import dynamic_step_driver
 from tf_agents.eval import metric_utils
 from tf_agents.metrics import tf_metrics
@@ -92,6 +93,7 @@ def train_eval_offline(
         batch_size=256,
         actor_learning_rate=3e-4,
         critic_learning_rate=3e-4,
+        behavioral_cloning_learning_rate=3e-4,
         gamma=0.99,
         gradient_clipping=None,
         use_tf_functions=True,
@@ -151,6 +153,20 @@ def train_eval_offline(
             kernel_initializer='glorot_uniform',
             last_kernel_initializer='glorot_uniform')
 
+        # TODO (chongyiz): implement behavioral cloning network
+        behavioral_cloning_net = actor_distribution_network.ActorDistributionNetwork(
+            observation_spec,
+            action_spec,
+            fc_layer_params=actor_fc_layers,
+            continuous_projection_net=proj_net)
+        behavioral_cloning_tf_agent = behavioral_cloning_agent.BehavioralCloningAgent(
+            time_step_spec,
+            action_spec,
+            behavioral_cloning_net,
+            tf.compat.v1.train.AdamOptimizer(
+                learning_rate=behavioral_cloning_learning_rate)
+        )
+
         # tf_agent = c_learning_agent.CLearningAgent(
         #     time_step_spec,
         #     action_spec,
@@ -171,6 +187,7 @@ def train_eval_offline(
         tf_agent = offline_c_learning_agent.OfflineCLearningAgent(
             time_step_spec,
             action_spec,
+            behavioral_cloning_agent=behavioral_cloning_tf_agent,
             actor_network=actor_net,
             critic_network=critic_net,
             actor_optimizer=tf.compat.v1.train.AdamOptimizer(
