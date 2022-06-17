@@ -72,7 +72,7 @@ def bce_loss(y_true, y_pred, label_smoothing=0):
 
 
 @gin.configurable
-def train_eval(
+def train_eval_offline(
         root_dir,
         env_name='sawyer_reach',
         num_iterations=3000000,
@@ -482,7 +482,7 @@ def main(_):
     logging.set_verbosity(logging.INFO)
     gin.parse_config_files_and_bindings(FLAGS.gin_file, FLAGS.gin_bindings)
     root_dir = FLAGS.root_dir
-    train_eval(root_dir)
+    train_eval_offline(root_dir)
 
 
 if __name__ == '__main__':

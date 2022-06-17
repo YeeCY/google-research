@@ -17,9 +17,10 @@ for seed in "${seeds[@]}"; do
   mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_large_v1/$seed
   nohup \
   python $PROJECT_DIR/train_eval_offline_d4rl.py \
-    --gin_bindings="train_eval.env_name='maze2d-large-v1'" \
-    --gin_bindings="train_eval.random_seed=${seed}" \
-    --gin_bindings="train_eval.num_iterations=1000000" \
+    --gin_bindings="train_eval_offline.env_name='maze2d-large-v1'" \
+    --gin_bindings="train_eval_offline.random_seed=${seed}" \
+    --gin_bindings="train_eval_offline.num_iterations=1000000" \
+    --gin_bindings="train_eval_offline.max_future_steps=250" \
     --gin_bindings="obs_to_goal.start_index=0" \
     --gin_bindings="obs_to_goal.end_index=2" \
     --gin_bindings="goal_fn.relabel_next_prob=0.5" \

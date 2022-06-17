@@ -120,7 +120,7 @@ def load_maze2d_open_v0():
     gym_env = Maze2DOpenV0()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=150,
+        max_episode_steps=151,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -130,7 +130,7 @@ def load_maze2d_umaze_v1():
     gym_env = Maze2DUmazeV1()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=300,
+        max_episode_steps=301,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -140,7 +140,7 @@ def load_maze2d_medium_v1():
     gym_env = Maze2DMediumV1()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=600,
+        max_episode_steps=601,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -150,7 +150,7 @@ def load_maze2d_large_v1():
     gym_env = Maze2DLargeV1()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=800,
+        max_episode_steps=801,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -160,7 +160,7 @@ def load_antmaze_umaze_diverse_v2():
     gym_env = AntMazeUmazeDiverseV2()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=700,
+        max_episode_steps=701,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -170,7 +170,7 @@ def load_antmaze_medium_diverse_v2():
     gym_env = AntMazeMediumDiverseV2()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=1000,
+        max_episode_steps=1001,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -180,7 +180,7 @@ def load_antmaze_large_diverse_v2():
     gym_env = AntMazeLargeDiverseV2()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=1000,
+        max_episode_steps=1001,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
