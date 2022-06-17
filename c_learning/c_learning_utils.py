@@ -15,6 +15,9 @@
 
 """Helper functions for C-learning."""
 
+import enum
+import numpy as np
+
 import gin
 import tensorflow as tf
 from tf_agents.agents.ddpg import critic_network
@@ -23,6 +26,13 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.utils import common
 from tf_agents.utils import nest_utils
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
+
+
+class CLearningReward(enum.Enum):
+    NEXT = 1
+    NEXT_FUTURE = 2
+    FUTURE = 3
+    RANDOM = 4
 
 
 def truncated_geometric(horizon, gamma):
@@ -40,8 +50,11 @@ def truncated_geometric(horizon, gamma):
     batch_size = tf.shape(horizon)[0]
     indices = tf.tile(
         tf.range(max_horizon, dtype=tf.float32)[None], (batch_size, 1))
-    probs = tf.where(indices < horizon[:, None], gamma ** indices,
-                     tf.zeros_like(indices))
+    # probs = tf.where(indices < horizon[:, None], gamma ** indices,
+    #                  tf.zeros_like(indices))
+    # (chongyiz): update future sampling probs to start from next_step
+    probs = tf.where(tf.math.logical_and(tf.zeros_like(indices) < indices, indices < horizon[:, None]),
+                     gamma ** (indices - 1), tf.zeros_like(indices))
     probs = probs / tf.reduce_sum(probs, axis=1)[:, None]
     indices = tf.random.categorical(tf.math.log(probs), 1, dtype=tf.int32)
     return indices[:, 0]  # Remove the extra dimension.
@@ -193,11 +206,13 @@ def offline_goal_fn(experience,
                     buffer_info,
                     relabel_orig_prob=0.0,
                     relabel_next_prob=0.5,
-                    relabel_future_prob=0.0,
+                    # relabel_future_prob=0.0,
+                    relabel_next_future_prob=0.0,
                     relabel_last_prob=0.0,
                     batch_size=None,
                     obs_dim=None,
-                    gamma=None):
+                    gamma=None,
+                    setting='b'):
     """Given experience, sample goals in three ways.
 
     The three ways are using the next state, an arbitrary future state, or a
@@ -228,14 +243,32 @@ def offline_goal_fn(experience,
     assert batch_size is not None
     assert obs_dim is not None
     assert gamma is not None
+
+    # TODO (chongyiz): Currently, we only implement off-policy version,
+    #  and we are gonna implement TD(\lambda) version later
+    if setting == 'b':
+        assert relabel_next_prob + relabel_next_future_prob == 0.5
+    elif setting == 'c':
+        assert relabel_next_prob == 0.5
+    else:
+        raise NotImplementedError
+
     relabel_orig_num = int(relabel_orig_prob * batch_size)
     relabel_next_num = int(relabel_next_prob * batch_size)
-    relabel_future_num = int(relabel_future_prob * batch_size)
     relabel_last_num = int(relabel_last_prob * batch_size)
-    relabel_random_num = batch_size - (
-            relabel_orig_num + relabel_next_num + relabel_future_num +
-            relabel_last_num)
-    assert relabel_random_num >= 0
+    if setting == 'b':
+        relabel_next_future_num = int(relabel_next_future_prob * batch_size)
+        relabel_future_num = batch_size - (
+                relabel_orig_num + relabel_next_num + relabel_next_future_num + relabel_last_num)
+        relabel_random_num = 0
+        assert relabel_future_num >= 0
+    elif setting == 'c':
+        # relabel_future_num = int(relabel_future_prob * batch_size)
+        relabel_future_num = 0
+        relabel_next_future_num = 0
+        relabel_random_num = batch_size - (
+                relabel_orig_num + relabel_next_num + relabel_last_num)
+        assert relabel_random_num >= 0
 
     orig_goals = experience.observation[:relabel_orig_num, 0, obs_dim:]
 
@@ -244,11 +277,16 @@ def offline_goal_fn(experience,
                  1, :obs_dim]
 
     index = relabel_orig_num + relabel_next_num
+    next_future_goals = get_future_goals(
+        experience.observation[index:index + relabel_next_future_num, 1:, :obs_dim],
+        experience.discount[index:index + relabel_next_future_num, 1:], gamma)
+
+    index = relabel_orig_num + relabel_next_num + relabel_next_future_num
     future_goals = get_future_goals(
         experience.observation[index:index + relabel_future_num, :, :obs_dim],
         experience.discount[index:index + relabel_future_num], gamma)
 
-    index = relabel_orig_num + relabel_next_num + relabel_future_num
+    index = relabel_orig_num + relabel_next_num + relabel_future_num + relabel_next_future_num
     last_goals = get_last_goals(
         experience.observation[index:index + relabel_last_num, :, :obs_dim],
         experience.discount[index:index + relabel_last_num])
@@ -256,13 +294,37 @@ def offline_goal_fn(experience,
     # For random goals we take other states from the same batch.
     random_goals = tf.random.shuffle(experience.observation[:relabel_random_num,
                                      0, :obs_dim])
-    new_goals = obs_to_goal(tf.concat([next_goals, future_goals,
+    new_goals = obs_to_goal(tf.concat([next_goals, next_future_goals, future_goals,
                                        last_goals, random_goals], axis=0))
     goals = tf.concat([orig_goals, new_goals], axis=0)
 
     obs = experience.observation[:, :2, :obs_dim]
-    reward = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
-    reward = tf.cast(reward, tf.float32)
+
+    # (chongyiz): construct rewards
+    if setting == 'b':
+        next_reward_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
+        next_reward = tf.cast(next_reward_mask, tf.float32) * CLearningReward.NEXT.value
+
+        next_future_mask = np.zeros(batch_size, dtype=np.float32)
+        next_future_mask[
+            relabel_orig_num + relabel_next_num:relabel_orig_num + relabel_next_num + relabel_next_future_num] = 1.0
+        next_future_mask = tf.convert_to_tensor(next_future_mask)
+        next_future_reward = next_future_mask * CLearningReward.NEXT_FUTURE.value
+
+        future_reward_mask = tf.math.logical_and(
+            tf.reduce_all(obs_to_goal(obs[:, 1]) != goals, axis=-1), ~tf.cast(next_future_mask, tf.bool))
+        future_reward = tf.cast(future_reward_mask, tf.float32) * CLearningReward.FUTURE.value
+        reward = next_reward + next_future_reward + future_reward
+    elif setting == 'c':
+        next_reward_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
+        next_reward = tf.cast(next_reward_mask, tf.float32) * CLearningReward.NEXT.value
+
+        random_reward_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) != goals, axis=-1)
+        random_reward = tf.cast(random_reward_mask, tf.float32) * CLearningReward.RANDOM.value
+        reward = next_reward + random_reward
+    else:
+        raise NotImplementedError
+
     reward = tf.tile(reward[:, None], [1, 2])
     new_obs = tf.concat([obs, tf.tile(goals[:, None, :], [1, 2, 1])], axis=2)
     experience = experience.replace(

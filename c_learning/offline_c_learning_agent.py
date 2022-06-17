@@ -44,6 +44,8 @@ from tf_agents.utils import eager_utils
 from tf_agents.utils import nest_utils
 from tf_agents.utils import object_identity
 
+from c_learning_utils import CLearningReward
+
 
 EPSILON = 1e-7
 CLearningLossInfo = collections.namedtuple(
@@ -420,9 +422,12 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         del weights
         if w_clipping is None:
             w_clipping = 1 / (1 - gamma)
-        rfp = gin.query_parameter('goal_fn.relabel_future_prob')
-        rnp = gin.query_parameter('goal_fn.relabel_next_prob')
-        assert rfp + rnp == 0.5
+        # rfp = gin.query_parameter('offline_goal_fn.relabel_future_prob')
+        rnp = gin.query_parameter('offline_goal_fn.relabel_next_prob')
+        rnfp = gin.query_parameter('offline_goal_fn.relabel_next_future_prob')
+        setting = gin.query_parameter('offline_goal_fn.setting')
+
+        # assert rfp + rnp == 0.5
         with tf.name_scope('critic_loss'):
             nest_utils.assert_same_structure(actions, self.action_spec)
             nest_utils.assert_same_structure(time_steps, self.time_step_spec)
@@ -454,6 +459,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             #     target_input, next_time_steps.step_type, training=False)
             # target_q_values = tf.minimum(target_q_values1, target_q_values2)
 
+            # TODO (chongyiz): implement policy ratio
             if policy_ratio:
                 # ratio = next_log_pi / next_log_pi_beta
                 raise NotImplementedError("Haven't implement policy ratio yet!")
@@ -473,25 +479,36 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
             batch_size = nest_utils.get_outer_shape(time_steps,
                                                     self._time_step_spec)[0]
-            half_batch = batch_size // 2
+            # half_batch = batch_size // 2
             float_batch_size = tf.cast(batch_size, float)
             num_next = tf.cast(tf.round(float_batch_size * rnp), tf.int32)
-            num_future = tf.cast(tf.round(float_batch_size * rfp), tf.int32)
-            if lambda_fix:
-                lambda_coef = 2 * rnp
-                weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
-                                     tf.fill((num_future,), 1.0),
-                                     (1 + lambda_coef * gamma * w)[half_batch:]],
-                                    axis=0)
-            else:
-                # weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
-                #                      tf.fill((num_future,), 1.0),
-                #                      (1 + gamma * w)[half_batch:]],
-                #                     axis=0)
-                # TODO (chongyiz): only work for num_future = 0 now
-                weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
-                                     tf.fill((num_future + half_batch,), 1.0)],
-                                    axis=0)
+            # num_future = tf.cast(tf.round(float_batch_size * rfp), tf.int32)
+            num_next_future = tf.cast(tf.round(float_batch_size * rnfp), tf.int32)
+
+            if setting == 'c':
+                num_next_future = 0
+
+            # TODO (chongyiz): only work for off-policy objective now
+            weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
+                                 tf.fill((num_next_future,), gamma),
+                                 tf.fill((batch_size - num_next - num_next_future,), 1.0)],
+                                axis=0)
+
+            # if lambda_fix:
+            #     lambda_coef = 2 * rnp
+            #     weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
+            #                          tf.fill((num_future,), 1.0),
+            #                          (1 + lambda_coef * gamma * w)[half_batch:]],
+            #                         axis=0)
+            # else:
+            #     # weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
+            #     #                      tf.fill((num_future,), 1.0),
+            #     #                      (1 + gamma * w)[half_batch:]],
+            #     #                     axis=0)
+            #     # TODO (chongyiz): only work for off-policy version now
+            #     weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
+            #                          tf.fill((num_future + half_batch,), 1.0)],
+            #                         axis=0)
 
             # Note that we assume that episodes never terminate. If they do, then
             # we need to include next_time_steps.discount in the (negative) TD target.
@@ -536,26 +553,54 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             pred_td_pos_targets2 = tf.clip_by_value(pred_td_pos_targets2, EPSILON, 1. - EPSILON)
             pred_td_neg_targets1 = tf.clip_by_value(pred_td_neg_targets1, EPSILON, 1. - EPSILON)
             pred_td_neg_targets2 = tf.clip_by_value(pred_td_neg_targets2, EPSILON, 1. - EPSILON)
-            # [1, ..., 1, 0, ..., 0]
-            first_half_batch_mask = next_time_steps.reward
-            first_half_batch_mask = tf.concat([tf.ones(half_batch),
-                                               first_half_batch_mask[half_batch:]], axis=0)
-            # [0, ..., 0, 1, ..., 1]
-            second_half_batch_mask = 1 - next_time_steps.reward
-            second_half_batch_mask = tf.concat([tf.zeros(half_batch),
-                                                second_half_batch_mask[half_batch:]], axis=0)
-            critic_loss1 = \
-                -first_half_batch_mask * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
-                second_half_batch_mask * (gamma * w) * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
-                second_half_batch_mask * tf.math.log(1 - pred_td_neg_targets1 + EPSILON)
-            # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
-            # rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
-            critic_loss2 = \
-                -first_half_batch_mask * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
-                second_half_batch_mask * (gamma * w) * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
-                second_half_batch_mask * tf.math.log(1 - pred_td_neg_targets2 + EPSILON)
-            # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
-            #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+
+            if setting == 'b':
+                # [1, ..., 1, 0, ..., 0]
+                next_mask = tf.cast(
+                    next_time_steps.reward == CLearningReward.NEXT.value, tf.float32)
+                # first_half_batch_mask = tf.concat([tf.ones(half_batch),
+                #                                    first_half_batch_mask[half_batch:]], axis=0)
+                # [0, ..., 0, 1, ..., 1, 0, ..., 0]
+                # second_half_batch_mask = 1 - next_time_steps.reward
+                # second_half_batch_mask = tf.concat([tf.zeros(half_batch),
+                #                                     second_half_batch_mask[half_batch:]], axis=0)
+                # TODO (chongyiz): fix this bug
+                # next_future_mask = (1 - next_time_steps.reward)[batch_size - num_next - num_next_future:].assign(
+                #     tf.fill((batch_size - num_next - num_next_future,), 0.0))
+                # future_mask = (1 - next_time_steps.reward)[num_next:num_next + num_next_future].assign(
+                #     tf.fill((num_next_future,), 0.0))
+                next_future_mask = tf.cast(
+                    next_time_steps.reward == CLearningReward.NEXT_FUTURE.value, tf.float32)
+                future_mask = tf.cast(
+                    next_time_steps.reward == CLearningReward.FUTURE.value, tf.float32)
+
+                critic_loss1 = -next_mask * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
+                               next_future_mask * w * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
+                               future_mask * tf.math.log(1 - pred_td_neg_targets1 + EPSILON)
+                # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
+                # rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+                critic_loss2 = -next_mask * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
+                               next_future_mask * w * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
+                               future_mask * tf.math.log(1 - pred_td_neg_targets2 + EPSILON)
+                # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
+                #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+            elif setting == 'c':
+                # [1, ..., 1, 0, ..., 0]
+                next_mask = tf.cast(
+                    next_time_steps.reward == CLearningReward.NEXT.value, tf.float32)
+
+                # [0, ..., 0, 1, ..., 1]
+                random_mask = tf.cast(
+                    next_time_steps.reward == CLearningReward.RANDOM.value, tf.float32)
+
+                critic_loss1 = -next_mask * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
+                               random_mask * w * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
+                               random_mask * tf.math.log(1 - pred_td_neg_targets1 + EPSILON)
+                critic_loss2 = -next_mask * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
+                               random_mask * w * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
+                               random_mask * tf.math.log(1 - pred_td_neg_targets2 + EPSILON)
+            else:
+                raise NotImplementedError
 
             critic_loss = critic_loss1 + critic_loss2
 
@@ -584,38 +629,38 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 data=tf.reduce_mean(
                     pred_td_pos_targets2 / (1 - pred_td_pos_targets2)),
                 step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='next C1 / (1 - C1)',
-                data=tf.reduce_mean(
-                    pred_td_pos_targets1[:num_next] / (1 - pred_td_pos_targets1[:num_next])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='next C2 / (1 - C2)',
-                data=tf.reduce_mean(
-                    pred_td_pos_targets2[:num_next] / (1 - pred_td_pos_targets2[:num_next])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='future C1 / (1 - C1)',
-                data=tf.reduce_mean(
-                    pred_td_pos_targets1[num_next:num_next + num_future] /
-                    (1 - pred_td_pos_targets1[num_next:num_next + num_future])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='future C2 / (1 - C2)',
-                data=tf.reduce_mean(
-                    pred_td_pos_targets2[num_next:num_next + num_future] /
-                    (1 - pred_td_pos_targets2[num_next:num_next + num_future])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='random C1 / (1 - C1)',
-                data=tf.reduce_mean(
-                    pred_td_pos_targets1[half_batch:] / (1 - pred_td_pos_targets1[half_batch:])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='random C2 / (1 - C2)',
-                data=tf.reduce_mean(
-                    pred_td_pos_targets2[half_batch:] / (1 - pred_td_pos_targets2[half_batch:])),
-                step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='next C1 / (1 - C1)',
+            #     data=tf.reduce_mean(
+            #         pred_td_pos_targets1[:num_next] / (1 - pred_td_pos_targets1[:num_next])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='next C2 / (1 - C2)',
+            #     data=tf.reduce_mean(
+            #         pred_td_pos_targets2[:num_next] / (1 - pred_td_pos_targets2[:num_next])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='future C1 / (1 - C1)',
+            #     data=tf.reduce_mean(
+            #         pred_td_pos_targets1[num_next:num_next + num_future] /
+            #         (1 - pred_td_pos_targets1[num_next:num_next + num_future])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='future C2 / (1 - C2)',
+            #     data=tf.reduce_mean(
+            #         pred_td_pos_targets2[num_next:num_next + num_future] /
+            #         (1 - pred_td_pos_targets2[num_next:num_next + num_future])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='random C1 / (1 - C1)',
+            #     data=tf.reduce_mean(
+            #         pred_td_pos_targets1[half_batch:] / (1 - pred_td_pos_targets1[half_batch:])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='random C2 / (1 - C2)',
+            #     data=tf.reduce_mean(
+            #         pred_td_pos_targets2[half_batch:] / (1 - pred_td_pos_targets2[half_batch:])),
+            #     step=self.train_step_counter)
             # tf.compat.v2.summary.scalar(
             #     name='C1 / (1 - C1) is NAN',
             #     data=tf.math.is_nan(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
