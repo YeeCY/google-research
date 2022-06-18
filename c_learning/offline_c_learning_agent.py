@@ -252,8 +252,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         next_actions = experience.action[:, -1]
 
         # TODO (chongyiz): train the behavioral cloning agent
-        behavioral_cloning_loss_info = self._behavioral_cloning_agent.train(
-            trajectory.from_transition(time_steps, policy_steps, next_time_steps))
+        with tf.name_scope('behavioral_cloning'):
+            behavioral_cloning_loss_info = self._behavioral_cloning_agent.train(
+                trajectory.from_transition(time_steps, policy_steps, next_time_steps))
 
         trainable_critic_variables = list(object_identity.ObjectIdentitySet(
             self._critic_network_1.trainable_variables +
