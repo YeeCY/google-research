@@ -59,11 +59,12 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
     def __init__(self,
                  time_step_spec,
                  action_spec,
-                 behavioral_cloning_agent,
                  critic_network,
                  actor_network,
+                 behavioral_cloning_network,
                  actor_optimizer,
                  critic_optimizer,
+                 behavioral_cloning_optimizer,
                  actor_loss_weight=1.0,
                  critic_loss_weight=0.5,
                  actor_policy_ctor=actor_policy.ActorPolicy,
@@ -137,7 +138,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
         self._check_action_spec(action_spec)
 
-        self._behavioral_cloning_agent = behavioral_cloning_agent
+        if behavioral_cloning_network:
+            behavioral_cloning_network.create_variables()
+        self._behavioral_cloning_network = behavioral_cloning_network
 
         self._critic_network_1 = critic_network
         self._critic_network_1.create_variables()
@@ -182,6 +185,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         self._target_update_period = target_update_period
         self._actor_optimizer = actor_optimizer
         self._critic_optimizer = critic_optimizer
+        self._behavioral_cloning_optimizer = behavioral_cloning_optimizer
         self._actor_loss_weight = actor_loss_weight
         self._critic_loss_weight = critic_loss_weight
         self._td_errors_loss_fn = td_errors_loss_fn
@@ -217,8 +221,6 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
         Copies weights from the Q networks to the target Q network.
         """
-        self._behavioral_cloning_agent.initialize()
-
         common.soft_variables_update(
             self._critic_network_1.variables,
             self._target_critic_network_1.variables,
@@ -252,9 +254,25 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         next_actions = experience.action[:, -1]
 
         # TODO (chongyiz): train the behavioral cloning agent
-        with tf.name_scope('behavioral_cloning'):
-            behavioral_cloning_loss_info = self._behavioral_cloning_agent.train(
-                trajectory.from_transition(time_steps, policy_steps, next_time_steps))
+        # behavioral_cloning_loss_info = self._behavioral_cloning_agent.train(
+        #     trajectory.from_transition(time_steps, policy_steps, next_time_steps))
+        trainable_behavioral_cloning_variables = \
+            self._behavioral_cloning_network.trainable_variables
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            assert trainable_behavioral_cloning_variables, ('No trainable behavioral cloning variables to '
+                                                            'optimize.')
+            tape.watch(trainable_behavioral_cloning_variables)
+            behavioral_cloning_loss = self.behavioral_cloning_loss(
+                time_steps,
+                actions,
+                weights=weights)
+
+        tf.debugging.check_numerics(behavioral_cloning_loss, 'Behavioral cloning is inf or nan.')
+        behavioral_cloning_grads = tape.gradient(
+            behavioral_cloning_loss, trainable_behavioral_cloning_variables)
+        self._apply_gradients(behavioral_cloning_grads,
+                              trainable_behavioral_cloning_variables,
+                              self._behavioral_cloning_optimizer)
 
         trainable_critic_variables = list(object_identity.ObjectIdentitySet(
             self._critic_network_1.trainable_variables +
@@ -293,7 +311,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
         with tf.name_scope('Losses'):
             tf.compat.v2.summary.scalar(
-                name="behavioral_cloning_loss", data=behavioral_cloning_loss_info.loss,
+                name="behavioral_cloning_loss", data=behavioral_cloning_loss,
                 step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='critic_loss', data=critic_loss, step=self.train_step_counter)
@@ -387,14 +405,14 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         action_distribution = self._train_policy.distribution(
             time_steps, policy_state=policy_state).action
         
-        cloning_network = self._behavioral_cloning_agent.cloning_network
-        cloning_network_state = cloning_network.get_initial_state(
+        cloning_network_state = self._behavioral_cloning_network.get_initial_state(
             batch_size)
-        behavioral_cloning_action_distribution, _ = cloning_network(
-            time_steps.observation,
-            step_type=time_steps.step_type,
-            training=False,
-            network_state=cloning_network_state)
+        behavioral_cloning_action_distribution, _ = \
+            self._behavioral_cloning_network(
+                time_steps.observation,
+                step_type=time_steps.step_type,
+                training=False,
+                network_state=cloning_network_state)
 
         # Get log_pis from transformed distribution.
         # actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
@@ -404,6 +422,44 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                                              self.action_spec)
 
         return log_pi, log_pi_beta
+
+    @gin.configurable
+    def behavioral_cloning_loss(self,
+                                time_steps,
+                                actions,
+                                weights=None):
+        with tf.name_scope('behavioral_cloning'):
+            nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            nest_utils.assert_same_structure(actions, self.action_spec)
+
+            batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+            network_state = self._behavioral_cloning_network.get_initial_state(batch_size)
+            bc_output, _ = self._behavioral_cloning_network(
+                time_steps.observation,
+                step_type=time_steps.step_type,
+                training=True,
+                network_state=network_state)
+
+            if isinstance(bc_output, tfp.distributions.Distribution):
+                bc_action = bc_output.sample()
+            else:
+                bc_action = bc_output
+
+            bc_loss = tf.nest.map_structure(tf.losses.mse, actions, bc_action)
+
+            if bc_loss.shape.rank > 1:
+                # Sum over the time dimension.
+                bc_loss = tf.reduce_sum(
+                    bc_loss, axis=range(1, bc_loss.shape.rank))
+
+            agg_loss = common.aggregate_losses(
+                per_example_loss=bc_loss,
+                sample_weight=weights,
+                regularization_loss=(self._critic_network_1.losses +
+                                     self._critic_network_2.losses))
+            bc_loss = agg_loss.total_loss
+
+        return bc_loss
 
     @gin.configurable
     def critic_loss(self,
@@ -420,7 +476,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                     lambda_fix=False,
                     policy_ratio=False,
                     policy_log_ratio_clip_min=-12,
-                    policy_log_ratio_clip_max=3,
+                    policy_log_ratio_clip_max=4,
                     # sarsa=False,
                     ):
         """Computes the critic loss for C-learning training.
