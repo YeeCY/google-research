@@ -14,23 +14,22 @@ declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
-  mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed
+  mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_umaze_v1/$seed
   nohup \
   python $PROJECT_DIR/train_eval_offline_d4rl.py \
-    --gin_bindings="train_eval_offline.env_name='maze2d-open-v0'" \
+    --gin_bindings="train_eval_offline.env_name='maze2d-umaze-v1'" \
     --gin_bindings="train_eval_offline.random_seed=${seed}" \
     --gin_bindings="train_eval_offline.num_iterations=1000000" \
-    --gin_bindings="train_eval_offline.max_future_steps=50" \
+    --gin_bindings="train_eval_offline.max_future_steps=100" \
     --gin_bindings="obs_to_goal.start_index=0" \
     --gin_bindings="obs_to_goal.end_index=2" \
-    --gin_bindings="offline_goal_fn.relabel_next_prob=0.3" \
-    --gin_bindings="offline_goal_fn.relabel_next_future_prob=0.2" \
-    --gin_bindings="offline_goal_fn.setting='b'" \
+    --gin_bindings="offline_goal_fn.relabel_next_prob=0.5" \
+    --gin_bindings="offline_goal_fn.relabel_next_future_prob=0.0" \
+    --gin_bindings="offline_goal_fn.setting='c'" \
     --gin_bindings="offline_c_learning_agent.actor_loss.ce_loss=True" \
     --gin_bindings="offline_c_learning_agent.actor_loss.bc_loss=True" \
-    --gin_bindings="offline_c_learning_agent.critic_loss.policy_ratio=False" \
-    --gin_bindings="offline_c_learning_agent.critic_loss.policy_log_ratio_clip_max=2" \
-    --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed \
-  > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed/stream.log 2>&1 & \
+    --gin_bindings="offline_c_learning_agent.critic_loss.policy_ratio=True" \
+    --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_umaze_v1/$seed \
+  > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_umaze_v1/$seed/stream.log 2>&1 & \
   sleep 2
 done
