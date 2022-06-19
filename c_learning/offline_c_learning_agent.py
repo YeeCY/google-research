@@ -778,7 +778,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                    time_steps,
                    actions,
                    weights=None,
-                   ce_loss=False):
+                   ce_loss=False,
+                   bc_loss=False,
+                   alpha=0.25):
         """Computes the actor_loss for C-learning training.
 
         Args:
@@ -818,6 +820,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                     tf.zeros_like(q_values), 1 - q_values)
             else:
                 actor_loss = -1.0 * q_values / (1 - q_values)
+
+            if bc_loss:
+                lam = alpha / tf.stop_gradient(tf.reduce_mean(tf.math.abs(q_values)))
+                actor_loss = lam * actor_loss + tf.losses.mse(actions, sampled_actions)
 
             if actor_loss.shape.rank > 1:
                 # Sum over the time dimension.
