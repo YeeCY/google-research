@@ -19,7 +19,7 @@ for seed in "${seeds[@]}"; do
   python $PROJECT_DIR/train_eval_offline_d4rl.py \
     --gin_bindings="train_eval_offline.env_name='maze2d-medium-v1'" \
     --gin_bindings="train_eval_offline.random_seed=${seed}" \
-    --gin_bindings="train_eval_offline.num_iterations=1000000" \
+    --gin_bindings="train_eval_offline.num_iterations=3000000" \
     --gin_bindings="train_eval_offline.max_future_steps=200" \
     --gin_bindings="obs_to_goal.start_index=0" \
     --gin_bindings="obs_to_goal.end_index=2" \
