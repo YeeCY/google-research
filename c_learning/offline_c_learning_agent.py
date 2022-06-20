@@ -780,7 +780,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                    weights=None,
                    ce_loss=False,
                    bc_loss=False,
-                   alpha=0.25):
+                   alpha=0.25,
+                   advantage_weighted_loss=False):
         """Computes the actor_loss for C-learning training.
 
         Args:
@@ -798,7 +799,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         with tf.name_scope('actor_loss'):
             nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
-            sampled_actions, log_pi = self._actions_and_log_probs(time_steps)
+            sampled_actions, sampled_log_pi = self._actions_and_log_probs(time_steps)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
             # start_index = gin.query_parameter('obs_to_goal.start_index')
@@ -808,22 +809,34 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             # mask[..., -(end_index - start_index):] = 1
             # mask = tf.convert_to_tensor(mask)
 
-            target_input = (time_steps.observation, sampled_actions)
-            q_values1, _ = self._critic_network_1(
-                target_input, time_steps.step_type, training=False)
-            q_values2, _ = self._critic_network_2(
-                target_input, time_steps.step_type, training=False)
-            q_values = tf.minimum(q_values1, q_values2)
+            sampled_target_input = (time_steps.observation, sampled_actions)
+            sampled_q_values1, _ = self._critic_network_1(
+                sampled_target_input, time_steps.step_type, training=False)
+            sampled_q_values1, _ = self._critic_network_2(
+                sampled_target_input, time_steps.step_type, training=False)
+            sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values1)
             if ce_loss:
                 actor_loss = tf.keras.losses.binary_crossentropy(
-                    tf.ones_like(q_values), q_values) - tf.keras.losses.binary_crossentropy(
-                    tf.zeros_like(q_values), 1 - q_values)
+                    tf.ones_like(sampled_q_values), sampled_q_values) - \
+                    tf.keras.losses.binary_crossentropy(
+                        tf.zeros_like(sampled_q_values), 1 - sampled_q_values)
             else:
-                actor_loss = -1.0 * q_values / (1 - q_values)
+                actor_loss = -1.0 * sampled_q_values / (1 - sampled_q_values)
 
             if bc_loss:
-                lam = alpha / tf.stop_gradient(tf.reduce_mean(tf.math.abs(q_values)))
+                lam = alpha / tf.stop_gradient(tf.reduce_mean(tf.math.abs(sampled_q_values)))
                 actor_loss = lam * actor_loss + tf.losses.mse(actions, sampled_actions)
+
+            if advantage_weighted_loss:
+                target_input = (time_steps.observation, actions)
+                q_values1, _ = self._critic_network_1(
+                    target_input, time_steps.step_type, training=False)
+                q_values2, _ = self._critic_network_2(
+                    target_input, time_steps.step_type, training=False)
+                q_values = tf.minimum(q_values1, q_values2)
+                log_pi, _ = self._log_probs(time_steps, actions)
+
+                actor_loss = -tf.reduce_mean(log_pi * q_values / (1 - q_values))
 
             if actor_loss.shape.rank > 1:
                 # Sum over the time dimension.
@@ -835,7 +848,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 sample_weight=weights,
                 regularization_loss=reg_loss)
             actor_loss = agg_loss.total_loss
-            self._actor_loss_debug_summaries(actor_loss, actions, log_pi,
+            self._actor_loss_debug_summaries(actor_loss, actions, sampled_log_pi,
                                              q_values, time_steps)
 
             return actor_loss
