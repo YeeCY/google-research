@@ -14,7 +14,7 @@ declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
-  mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_umaze_diverse_v2/$seed
+  mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_umaze_v2/$seed
   nohup \
   python $PROJECT_DIR/train_eval_offline.py \
     --gin_bindings="train_eval_offline.env_name='antmaze-umaze-v2'" \
@@ -25,7 +25,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="obs_to_goal.end_index=2" \
     --gin_bindings="goal_fn.relabel_next_prob=0.5" \
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
-    --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_umaze_diverse_v2/$seed \
-  > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_umaze_diverse_v2/$seed/stream.log 2>&1 & \
+    --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_umaze_v2/$seed \
+  > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_umaze_v2/$seed/stream.log 2>&1 & \
   sleep 2
 done
