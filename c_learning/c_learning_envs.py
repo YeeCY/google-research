@@ -259,6 +259,9 @@ def load(env_name):
     elif env_name == 'antmaze-large-diverse-v2':
         tf_env = load_antmaze_large_diverse_v2()
         eval_tf_env = load_antmaze_large_diverse_v2()
+    elif env_name == '':
+        tf_env = None
+        eval_tf_env = None
     else:
         raise NotImplementedError('Unsupported environment: %s' % env_name)
     assert len(tf_env.envs) == 1
