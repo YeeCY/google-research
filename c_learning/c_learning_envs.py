@@ -34,6 +34,8 @@ from d4rl.offline_env import download_dataset_from_url, get_keys
 from d4rl import pointmaze
 from d4rl import locomotion
 
+from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+
 from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
 from tf_agents.environments import wrappers
@@ -207,6 +209,17 @@ def load_antmaze_large_diverse_v2():
     return tf_py_environment.TFPyEnvironment(env)
 
 
+def load_metaworld(env_name):
+    goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[env_name + "-goal-observable"]
+    gym_env = goal_observable_cls()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=gym_env.max_path_length,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
 def load(env_name):
     """Creates the training and evaluation environment.
 
@@ -259,9 +272,10 @@ def load(env_name):
     elif env_name == 'antmaze-large-diverse-v2':
         tf_env = load_antmaze_large_diverse_v2()
         eval_tf_env = load_antmaze_large_diverse_v2()
-    elif env_name == '':
-        tf_env = None
-        eval_tf_env = None
+    elif env_name.startswith('metaworld'):
+        env_name_ = env_name.split('.')[-1]
+        tf_env = load_metaworld(env_name_)
+        eval_tf_env = load_metaworld(env_name_)
     else:
         raise NotImplementedError('Unsupported environment: %s' % env_name)
     assert len(tf_env.envs) == 1
@@ -272,7 +286,10 @@ def load(env_name):
     # agent should only look at certain subsets of the goal state. The following
     # code modifies the environment observation to include the full state but only
     # the user-specified dimensions of the goal state.
-    obs_dim = tf_env.observation_spec().shape[0] // 2
+    if env_name.startswith('metaworld'):
+        obs_dim = tf_env.observation_spec().shape[0] - 3
+    else:
+        obs_dim = tf_env.observation_spec().shape[0] // 2
     try:
         start_index = gin.query_parameter('obs_to_goal.start_index')
     except ValueError:
@@ -282,7 +299,10 @@ def load(env_name):
     except ValueError:
         end_index = None
     if end_index is None:
-        end_index = obs_dim
+        if env_name.startswith('metaworld'):
+            end_index = 3
+        else:
+            end_index = obs_dim
 
     indices = np.concatenate([
         np.arange(obs_dim),
@@ -295,293 +315,293 @@ def load(env_name):
     return (tf_env, eval_tf_env, obs_dim)
 
 
-class SawyerReach(sawyer_xyz.SawyerReachPushPickPlaceEnv):
-    """Wrapper for the sawyer_reach task."""
-
-    def __init__(self):
-        super(SawyerReach, self).__init__(task_type='reach')
-        self.observation_space = gym.spaces.Box(
-            low=np.full(12, -np.inf),
-            high=np.full(12, np.inf),
-            dtype=np.float32)
-
-    def reset(self):
-        goal = self.sample_goals(1)['state_desired_goal'][0]
-        self.goal = goal
-        self._state_goal = goal
-        return self.reset_model()
-
-    def step(self, action):
-        s, r, done, info = super(SawyerReach, self).step(action)
-        r = 0.0
-        done = False
-        return s, r, done, info
-
-    def _get_obs(self):
-        obs = super(SawyerReach, self)._get_obs()
-        return np.concatenate([obs, self.goal, np.zeros(3)])
-
-
-class SawyerPush(sawyer_xyz.SawyerReachPushPickPlaceEnv):
-    """Wrapper for the sawyer_push task."""
-
-    def __init__(self, random_init=False, goal_low=None):
-        assert goal_low is not None
-
-        super(SawyerPush, self).__init__(
-            task_type='push', random_init=random_init, goal_low=goal_low)
-        self.observation_space = gym.spaces.Box(
-            low=np.full(12, -np.inf),
-            high=np.full(12, np.inf),
-            dtype=np.float32)
-
-    @gin.configurable(module='SawyerPush')
-    def reset(self,
-              arm_goal_type='random',
-              fix_z=False,
-              fix_xy=False,
-              fix_g=False,
-              reset_puck=False,
-              in_hand_prob=0,
-              custom_eval=False,
-              reset_to_puck_prob=0.0):
-        assert arm_goal_type in ['random', 'puck', 'goal']
-        if custom_eval and self.MODE == 'eval':
-            arm_goal_type = 'goal'
-            in_hand_prob = 0
-            reset_to_puck_prob = 0.0
-        self._arm_goal_type = arm_goal_type
-        # The arm_goal seems to be set to some (dummy) value before we can reset
-        # the environment.
-        self._arm_goal = np.zeros(3)
-        if fix_g:
-            self._gripper_goal = np.array([0.016])
-        else:
-            self._gripper_goal = np.random.uniform(0, 0.04, (1,))
-        obs = super(SawyerPush, self).reset()
-        if reset_puck:
-            puck_pos = self.sample_goals(1)['state_desired_goal'][0]
-            puck_pos[2] = 0.015
-        else:
-            puck_pos = obs[3:6]
-        # The following line ensures that the puck starts face-up, not on edge.
-        self._set_obj_xyz_quat(puck_pos, 0.0)
-        if np.random.random() < reset_to_puck_prob:
-            obs = self._get_obs()
-            self.data.set_mocap_pos('mocap', obs[3:6])
-            self.data.set_mocap_quat('mocap', np.array([1, 0, 1, 0]))
-            for _ in range(10):
-                self.do_simulation([-1, 1], self.frame_skip)
-
-        if np.random.random() < in_hand_prob:
-            for _ in range(10):
-                obs, _, _, _ = self.step(np.array([0, 0, 0, 1]))
-            self._set_obj_xyz_quat(obs[:3], 0.0)
-        obs = self._get_obs()
-
-        self.goal = self.sample_goals(1)['state_desired_goal'][0]
-        if fix_z:
-            self.goal[2] = 0.015
-        if fix_xy:
-            self.goal[:2] = obs[3:5]
-
-        self._set_goal_marker(self.goal)
-        self._state_goal = self.goal.copy()
-
-        if arm_goal_type == 'random':
-            self._arm_goal = self.sample_goals(1)['state_desired_goal'][0]
-            if fix_z:
-                self._arm_goal[2] = 0.015
-        elif arm_goal_type == 'puck':
-            self._arm_goal = obs[3:6]
-        elif arm_goal_type == 'goal':
-            self._arm_goal = self.goal.copy()
-        else:
-            raise NotImplementedError
-        return self._get_obs()
-
-    def step(self, action):
-        try:
-            s, r, done, info = super(SawyerPush, self).step(action)
-        except mujoco_py.MujocoException as me:
-            logging.info('MujocoException: %s', me)
-            s = self.reset()
-            info = {}
-
-        r = 0.0
-        done = False
-        return s, r, done, info
-
-    def _get_obs(self):
-        obs = super(SawyerPush, self)._get_obs()
-        obs = np.concatenate([obs, self._arm_goal, self.goal])
-        return obs
-
-
-class SawyerPushGripper(SawyerPush):
-    """Wrapper for the sawyer_push task, including the gripper in the state."""
-
-    MODE = 'train'
-
-    def __init__(self, random_init=False, goal_low=None):
-        assert goal_low is not None
-
-        super(SawyerPushGripper, self).__init__(
-            random_init=random_init, goal_low=goal_low)
-        self.observation_space = gym.spaces.Box(
-            low=np.full(14, -np.inf), high=np.full(14, np.inf), dtype=np.float32)
-
-    def _get_obs(self):
-        obs = super(SawyerPushGripper, self)._get_obs()
-        gripper = self.get_gripper_pos()
-        obs = np.concatenate(
-            [obs, gripper, self._arm_goal, self.goal, self._gripper_goal])
-        return obs
-
-
-class SawyerWindow(sawyer_xyz.SawyerWindowCloseEnv):
-    """Wrapper for the sawyer_window task."""
-
-    def __init__(self, rotMode='fixed'):  # pylint: disable=invalid-name
-        super(SawyerWindow, self).__init__(random_init=False, rotMode=rotMode)
-        self.observation_space = gym.spaces.Box(
-            low=np.full(12, -np.inf), high=np.full(12, np.inf), dtype=np.float32)
-
-    def sample_goal(self):
-        low = np.array([-0.09, 0.73, 0.15])
-        high = np.array([0.09, 0.73, 0.15])
-        return np.random.uniform(low, high)
-
-    @gin.configurable(module='SawyerWindow')
-    def reset(self, arm_goal_type='random', reset_puck=True):
-        assert arm_goal_type in ['random', 'puck', 'goal']
-        self.goal = self.sample_goal()
-        self._state_goal = self.goal.copy()
-        self._arm_goal = np.zeros(3)
-        super(SawyerWindow, self).reset()
-        # Randomize the window position
-        pos = self.sim.model.body_pos[self.model.body_name2id('window')]
-        if reset_puck:
-            pos[0] = self.sample_goal()[0]
-        else:
-            pos[0] = 0.0
-        self.sim.model.body_pos[self.model.body_name2id('window')] = pos
-        another_pos = pos.copy()
-        another_pos[1] += 0.03
-        self.sim.model.body_pos[self.model.body_name2id(
-            'window_another')] = another_pos
-
-        # We have set the desired state of the window above. We have to step the
-        # environment once (using a null-op action) for these changes to take
-        # effect.
-        obs, _, _, _ = self.step(np.zeros(4))
-        if arm_goal_type == 'random':
-            self._arm_goal = self.sample_goal()
-        elif arm_goal_type == 'puck':
-            self._arm_goal = obs[3:6]
-        elif arm_goal_type == 'goal':
-            self._arm_goal = self.goal.copy()
-        else:
-            raise NotImplementedError
-        return self._get_obs()
-
-    def step(self, action):
-        try:
-            s, r, done, info = super(SawyerWindow, self).step(action)
-        except mujoco_py.MujocoException as me:
-            logging.info('MujocoException: %s', me)
-            s = self.reset()
-            info = {}
-        r = 0.0
-        done = False
-        return s, r, done, info
-
-    def _get_obs(self):
-        obs = super(SawyerWindow, self)._get_obs()
-        return np.concatenate([obs, self._arm_goal, self.goal])
-
-
-class SawyerDrawer(sawyer_xyz.SawyerDrawerOpenEnv):
-    """Wrapper for the sawyer_drawer task."""
-
-    def __init__(self, random_init=False):
-        super(SawyerDrawer, self).__init__(random_init=random_init)
-        self.observation_space = gym.spaces.Box(
-            low=np.full(12, -np.inf), high=np.full(12, np.inf), dtype=np.float32)
-
-    @gin.configurable(module='SawyerDrawer')
-    def reset(self, arm_goal_type='puck'):
-        assert arm_goal_type in ['puck', 'goal']
-        self._arm_goal = np.zeros(3)
-        self.goal = np.zeros(3)
-        self._state_goal = np.zeros(3)
-        obs = super(SawyerDrawer, self).reset()
-        offset = np.random.uniform(-0.2, 0)
-        self._set_obj_xyz(offset)
-
-        self.goal = obs[3:6]
-        self.goal[1] = np.random.uniform(0.5, 0.7)
-        if arm_goal_type == 'puck':
-            self._arm_goal = obs[3:6]
-        elif arm_goal_type == 'goal':
-            self._arm_goal = self.goal.copy()
-        else:
-            raise NotImplementedError
-        return self._get_obs()
-
-    def step(self, action):
-        s, r, done, info = super(SawyerDrawer, self).step(action)
-        r = 0.0
-        done = False
-        return s, r, done, info
-
-    def _get_obs(self):
-        obs = super(SawyerDrawer, self)._get_obs()
-        return np.concatenate([obs, self._arm_goal, self.goal])
-
-
-class SawyerFaucet(sawyer_xyz.SawyerFaucetOpenEnv):
-    """Wrapper for the sawyer_faucet task."""
-
-    def __init__(self):
-        super(SawyerFaucet, self).__init__()
-        self.observation_space = gym.spaces.Box(
-            low=np.full(12, -np.inf), high=np.full(12, np.inf), dtype=np.float32)
-
-    @gin.configurable(module='SawyerFaucet')
-    def reset(self, arm_goal_type='goal', init_width=np.pi / 2,
-              goal_width=np.pi / 2):
-        assert arm_goal_type in ['puck', 'goal']
-        self._arm_goal = np.zeros(3)
-        self.goal = np.zeros(3)
-        self._state_goal = np.zeros(3)
-        obs = super(SawyerFaucet, self).reset()
-
-        offset = np.random.uniform(-goal_width, goal_width)
-        self._set_obj_xyz(offset)
-        self.goal = self._get_obs()[3:6]
-
-        offset = np.random.uniform(-init_width, init_width)
-        self._set_obj_xyz(offset)
-        obs = self._get_obs()
-
-        if arm_goal_type == 'puck':
-            self._arm_goal = obs[3:6]
-        elif arm_goal_type == 'goal':
-            self._arm_goal = self.goal.copy()
-        else:
-            raise NotImplementedError
-        return self._get_obs()
-
-    def step(self, action):
-        s, r, done, info = super(SawyerFaucet, self).step(action)
-        r = 0.0
-        done = False
-        return s, r, done, info
-
-    def _get_obs(self):
-        obs = super(SawyerFaucet, self)._get_obs()
-        return np.concatenate([obs, self._arm_goal, self.goal])
+# class SawyerReach(sawyer_xyz.SawyerReachPushPickPlaceEnv):
+#     """Wrapper for the sawyer_reach task."""
+#
+#     def __init__(self):
+#         super(SawyerReach, self).__init__(task_type='reach')
+#         self.observation_space = gym.spaces.Box(
+#             low=np.full(12, -np.inf),
+#             high=np.full(12, np.inf),
+#             dtype=np.float32)
+#
+#     def reset(self):
+#         goal = self.sample_goals(1)['state_desired_goal'][0]
+#         self.goal = goal
+#         self._state_goal = goal
+#         return self.reset_model()
+#
+#     def step(self, action):
+#         s, r, done, info = super(SawyerReach, self).step(action)
+#         r = 0.0
+#         done = False
+#         return s, r, done, info
+#
+#     def _get_obs(self):
+#         obs = super(SawyerReach, self)._get_obs()
+#         return np.concatenate([obs, self.goal, np.zeros(3)])
+#
+#
+# class SawyerPush(sawyer_xyz.SawyerReachPushPickPlaceEnv):
+#     """Wrapper for the sawyer_push task."""
+#
+#     def __init__(self, random_init=False, goal_low=None):
+#         assert goal_low is not None
+#
+#         super(SawyerPush, self).__init__(
+#             task_type='push', random_init=random_init, goal_low=goal_low)
+#         self.observation_space = gym.spaces.Box(
+#             low=np.full(12, -np.inf),
+#             high=np.full(12, np.inf),
+#             dtype=np.float32)
+#
+#     @gin.configurable(module='SawyerPush')
+#     def reset(self,
+#               arm_goal_type='random',
+#               fix_z=False,
+#               fix_xy=False,
+#               fix_g=False,
+#               reset_puck=False,
+#               in_hand_prob=0,
+#               custom_eval=False,
+#               reset_to_puck_prob=0.0):
+#         assert arm_goal_type in ['random', 'puck', 'goal']
+#         if custom_eval and self.MODE == 'eval':
+#             arm_goal_type = 'goal'
+#             in_hand_prob = 0
+#             reset_to_puck_prob = 0.0
+#         self._arm_goal_type = arm_goal_type
+#         # The arm_goal seems to be set to some (dummy) value before we can reset
+#         # the environment.
+#         self._arm_goal = np.zeros(3)
+#         if fix_g:
+#             self._gripper_goal = np.array([0.016])
+#         else:
+#             self._gripper_goal = np.random.uniform(0, 0.04, (1,))
+#         obs = super(SawyerPush, self).reset()
+#         if reset_puck:
+#             puck_pos = self.sample_goals(1)['state_desired_goal'][0]
+#             puck_pos[2] = 0.015
+#         else:
+#             puck_pos = obs[3:6]
+#         # The following line ensures that the puck starts face-up, not on edge.
+#         self._set_obj_xyz_quat(puck_pos, 0.0)
+#         if np.random.random() < reset_to_puck_prob:
+#             obs = self._get_obs()
+#             self.data.set_mocap_pos('mocap', obs[3:6])
+#             self.data.set_mocap_quat('mocap', np.array([1, 0, 1, 0]))
+#             for _ in range(10):
+#                 self.do_simulation([-1, 1], self.frame_skip)
+#
+#         if np.random.random() < in_hand_prob:
+#             for _ in range(10):
+#                 obs, _, _, _ = self.step(np.array([0, 0, 0, 1]))
+#             self._set_obj_xyz_quat(obs[:3], 0.0)
+#         obs = self._get_obs()
+#
+#         self.goal = self.sample_goals(1)['state_desired_goal'][0]
+#         if fix_z:
+#             self.goal[2] = 0.015
+#         if fix_xy:
+#             self.goal[:2] = obs[3:5]
+#
+#         self._set_goal_marker(self.goal)
+#         self._state_goal = self.goal.copy()
+#
+#         if arm_goal_type == 'random':
+#             self._arm_goal = self.sample_goals(1)['state_desired_goal'][0]
+#             if fix_z:
+#                 self._arm_goal[2] = 0.015
+#         elif arm_goal_type == 'puck':
+#             self._arm_goal = obs[3:6]
+#         elif arm_goal_type == 'goal':
+#             self._arm_goal = self.goal.copy()
+#         else:
+#             raise NotImplementedError
+#         return self._get_obs()
+#
+#     def step(self, action):
+#         try:
+#             s, r, done, info = super(SawyerPush, self).step(action)
+#         except mujoco_py.MujocoException as me:
+#             logging.info('MujocoException: %s', me)
+#             s = self.reset()
+#             info = {}
+#
+#         r = 0.0
+#         done = False
+#         return s, r, done, info
+#
+#     def _get_obs(self):
+#         obs = super(SawyerPush, self)._get_obs()
+#         obs = np.concatenate([obs, self._arm_goal, self.goal])
+#         return obs
+#
+#
+# class SawyerPushGripper(SawyerPush):
+#     """Wrapper for the sawyer_push task, including the gripper in the state."""
+#
+#     MODE = 'train'
+#
+#     def __init__(self, random_init=False, goal_low=None):
+#         assert goal_low is not None
+#
+#         super(SawyerPushGripper, self).__init__(
+#             random_init=random_init, goal_low=goal_low)
+#         self.observation_space = gym.spaces.Box(
+#             low=np.full(14, -np.inf), high=np.full(14, np.inf), dtype=np.float32)
+#
+#     def _get_obs(self):
+#         obs = super(SawyerPushGripper, self)._get_obs()
+#         gripper = self.get_gripper_pos()
+#         obs = np.concatenate(
+#             [obs, gripper, self._arm_goal, self.goal, self._gripper_goal])
+#         return obs
+#
+#
+# class SawyerWindow(sawyer_xyz.SawyerWindowCloseEnv):
+#     """Wrapper for the sawyer_window task."""
+#
+#     def __init__(self, rotMode='fixed'):  # pylint: disable=invalid-name
+#         super(SawyerWindow, self).__init__(random_init=False, rotMode=rotMode)
+#         self.observation_space = gym.spaces.Box(
+#             low=np.full(12, -np.inf), high=np.full(12, np.inf), dtype=np.float32)
+#
+#     def sample_goal(self):
+#         low = np.array([-0.09, 0.73, 0.15])
+#         high = np.array([0.09, 0.73, 0.15])
+#         return np.random.uniform(low, high)
+#
+#     @gin.configurable(module='SawyerWindow')
+#     def reset(self, arm_goal_type='random', reset_puck=True):
+#         assert arm_goal_type in ['random', 'puck', 'goal']
+#         self.goal = self.sample_goal()
+#         self._state_goal = self.goal.copy()
+#         self._arm_goal = np.zeros(3)
+#         super(SawyerWindow, self).reset()
+#         # Randomize the window position
+#         pos = self.sim.model.body_pos[self.model.body_name2id('window')]
+#         if reset_puck:
+#             pos[0] = self.sample_goal()[0]
+#         else:
+#             pos[0] = 0.0
+#         self.sim.model.body_pos[self.model.body_name2id('window')] = pos
+#         another_pos = pos.copy()
+#         another_pos[1] += 0.03
+#         self.sim.model.body_pos[self.model.body_name2id(
+#             'window_another')] = another_pos
+#
+#         # We have set the desired state of the window above. We have to step the
+#         # environment once (using a null-op action) for these changes to take
+#         # effect.
+#         obs, _, _, _ = self.step(np.zeros(4))
+#         if arm_goal_type == 'random':
+#             self._arm_goal = self.sample_goal()
+#         elif arm_goal_type == 'puck':
+#             self._arm_goal = obs[3:6]
+#         elif arm_goal_type == 'goal':
+#             self._arm_goal = self.goal.copy()
+#         else:
+#             raise NotImplementedError
+#         return self._get_obs()
+#
+#     def step(self, action):
+#         try:
+#             s, r, done, info = super(SawyerWindow, self).step(action)
+#         except mujoco_py.MujocoException as me:
+#             logging.info('MujocoException: %s', me)
+#             s = self.reset()
+#             info = {}
+#         r = 0.0
+#         done = False
+#         return s, r, done, info
+#
+#     def _get_obs(self):
+#         obs = super(SawyerWindow, self)._get_obs()
+#         return np.concatenate([obs, self._arm_goal, self.goal])
+#
+#
+# class SawyerDrawer(sawyer_xyz.SawyerDrawerOpenEnv):
+#     """Wrapper for the sawyer_drawer task."""
+#
+#     def __init__(self, random_init=False):
+#         super(SawyerDrawer, self).__init__(random_init=random_init)
+#         self.observation_space = gym.spaces.Box(
+#             low=np.full(12, -np.inf), high=np.full(12, np.inf), dtype=np.float32)
+#
+#     @gin.configurable(module='SawyerDrawer')
+#     def reset(self, arm_goal_type='puck'):
+#         assert arm_goal_type in ['puck', 'goal']
+#         self._arm_goal = np.zeros(3)
+#         self.goal = np.zeros(3)
+#         self._state_goal = np.zeros(3)
+#         obs = super(SawyerDrawer, self).reset()
+#         offset = np.random.uniform(-0.2, 0)
+#         self._set_obj_xyz(offset)
+#
+#         self.goal = obs[3:6]
+#         self.goal[1] = np.random.uniform(0.5, 0.7)
+#         if arm_goal_type == 'puck':
+#             self._arm_goal = obs[3:6]
+#         elif arm_goal_type == 'goal':
+#             self._arm_goal = self.goal.copy()
+#         else:
+#             raise NotImplementedError
+#         return self._get_obs()
+#
+#     def step(self, action):
+#         s, r, done, info = super(SawyerDrawer, self).step(action)
+#         r = 0.0
+#         done = False
+#         return s, r, done, info
+#
+#     def _get_obs(self):
+#         obs = super(SawyerDrawer, self)._get_obs()
+#         return np.concatenate([obs, self._arm_goal, self.goal])
+#
+#
+# class SawyerFaucet(sawyer_xyz.SawyerFaucetOpenEnv):
+#     """Wrapper for the sawyer_faucet task."""
+#
+#     def __init__(self):
+#         super(SawyerFaucet, self).__init__()
+#         self.observation_space = gym.spaces.Box(
+#             low=np.full(12, -np.inf), high=np.full(12, np.inf), dtype=np.float32)
+#
+#     @gin.configurable(module='SawyerFaucet')
+#     def reset(self, arm_goal_type='goal', init_width=np.pi / 2,
+#               goal_width=np.pi / 2):
+#         assert arm_goal_type in ['puck', 'goal']
+#         self._arm_goal = np.zeros(3)
+#         self.goal = np.zeros(3)
+#         self._state_goal = np.zeros(3)
+#         obs = super(SawyerFaucet, self).reset()
+#
+#         offset = np.random.uniform(-goal_width, goal_width)
+#         self._set_obj_xyz(offset)
+#         self.goal = self._get_obs()[3:6]
+#
+#         offset = np.random.uniform(-init_width, init_width)
+#         self._set_obj_xyz(offset)
+#         obs = self._get_obs()
+#
+#         if arm_goal_type == 'puck':
+#             self._arm_goal = obs[3:6]
+#         elif arm_goal_type == 'goal':
+#             self._arm_goal = self.goal.copy()
+#         else:
+#             raise NotImplementedError
+#         return self._get_obs()
+#
+#     def step(self, action):
+#         s, r, done, info = super(SawyerFaucet, self).step(action)
+#         r = 0.0
+#         done = False
+#         return s, r, done, info
+#
+#     def _get_obs(self):
+#         obs = super(SawyerFaucet, self)._get_obs()
+#         return np.concatenate([obs, self._arm_goal, self.goal])
 
 
 class Maze2DBase(pointmaze.MazeEnv):

@@ -7,10 +7,12 @@ import numpy as np
 
 
 def main():
-    door_open_goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE["door-open-v2-goal-observable"]
-    door_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN["door-open-v2-goal-hidden"]
+    # door_open_goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE["door-open-v2-goal-observable"]
+    # door_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN["door-open-v2-goal-hidden"]
+    reach_goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE["reach-v2-goal-observable"]
+    reach_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN["reach-v2-goal-hidden"]
 
-    env = door_open_goal_hidden_cls()
+    env = reach_goal_hidden_cls()
     env.reset()  # Reset environment
     a = env.action_space.sample()  # Sample an action
     obs, reward, done, info = env.step(a)  # Step the environoment with the sampled random action
@@ -18,8 +20,8 @@ def main():
 
     # You can choose to initialize the random seed of the environment.
     # The state of your rng will remain unaffected after the environment is constructed.
-    env1 = door_open_goal_observable_cls(seed=5)
-    env2 = door_open_goal_observable_cls(seed=5)
+    env1 = reach_goal_observable_cls(seed=5)
+    env2 = reach_goal_observable_cls(seed=5)
 
     env1.reset()  # Reset environment
     env2.reset()
@@ -31,7 +33,7 @@ def main():
     assert not (next_obs2[-3:] == np.zeros(
         3)).all()  # The env's are goal observable, meaning the goal is not zero'd out
 
-    env3 = door_open_goal_observable_cls(seed=10)  # Construct an environment with a different seed
+    env3 = reach_goal_observable_cls(seed=10)  # Construct an environment with a different seed
     env1.reset()  # Reset environment
     env3.reset()
     a1 = env1.action_space.sample()  # Sample an action
