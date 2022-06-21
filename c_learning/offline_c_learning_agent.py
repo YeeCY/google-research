@@ -849,7 +849,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 regularization_loss=reg_loss)
             actor_loss = agg_loss.total_loss
             self._actor_loss_debug_summaries(actor_loss, actions, sampled_log_pi,
-                                             q_values, time_steps)
+                                             sampled_q_values, time_steps)
 
             return actor_loss
 
