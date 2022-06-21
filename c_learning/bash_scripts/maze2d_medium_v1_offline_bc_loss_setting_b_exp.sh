@@ -19,7 +19,7 @@ for seed in "${seeds[@]}"; do
   python $PROJECT_DIR/train_eval_offline_d4rl.py \
     --gin_bindings="train_eval_offline.env_name='maze2d-medium-v1'" \
     --gin_bindings="train_eval_offline.random_seed=${seed}" \
-    --gin_bindings="train_eval_offline.num_iterations=3000000" \
+    --gin_bindings="train_eval_offline.num_iterations=1000000" \
     --gin_bindings="train_eval_offline.max_future_steps=200" \
     --gin_bindings="obs_to_goal.start_index=0" \
     --gin_bindings="obs_to_goal.end_index=2" \
@@ -28,6 +28,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="offline_goal_fn.setting='b'" \
     --gin_bindings="offline_c_learning_agent.actor_loss.ce_loss=True" \
     --gin_bindings="offline_c_learning_agent.actor_loss.bc_loss=True" \
+    --gin_bindings="offline_c_learning_agent.bc_lambda=0.25" \
     --gin_bindings="offline_c_learning_agent.critic_loss.policy_ratio=False" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1/$seed \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1/$seed/stream.log 2>&1 & \

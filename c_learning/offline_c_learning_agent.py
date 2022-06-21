@@ -780,8 +780,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                    weights=None,
                    ce_loss=False,
                    bc_loss=False,
-                   alpha=0.25,
-                   advantage_weighted_loss=False):
+                   bc_lambda=0.25,
+                   aw_loss=False,
+                   aw_lambda=1.0):
         """Computes the actor_loss for C-learning training.
 
         Args:
@@ -824,10 +825,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 actor_loss = -1.0 * sampled_q_values / (1 - sampled_q_values)
 
             if bc_loss:
-                lam = alpha / tf.stop_gradient(tf.reduce_mean(tf.math.abs(sampled_q_values)))
-                actor_loss = lam * actor_loss + tf.losses.mse(actions, sampled_actions)
+                actor_loss += bc_lambda * tf.losses.mse(actions, sampled_actions)
 
-            if advantage_weighted_loss:
+            if aw_loss:
                 target_input = (time_steps.observation, actions)
                 q_values1, _ = self._critic_network_1(
                     target_input, time_steps.step_type, training=False)
@@ -836,7 +836,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 q_values = tf.minimum(q_values1, q_values2)
                 log_pi, _ = self._log_probs(time_steps, actions)
 
-                actor_loss = -tf.reduce_mean(log_pi * q_values / (1 - q_values))
+                actor_loss = -tf.reduce_mean(
+                    log_pi *
+                    tf.math.exp((tf.math.log(q_values) - tf.math.log(1 - q_values)) / aw_lambda)
+                )
 
             if actor_loss.shape.rank > 1:
                 # Sum over the time dimension.
