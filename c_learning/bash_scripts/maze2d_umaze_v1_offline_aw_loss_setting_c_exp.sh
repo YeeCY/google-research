@@ -28,7 +28,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="offline_goal_fn.setting='c'" \
     --gin_bindings="offline_c_learning_agent.actor_loss.ce_loss=False" \
     --gin_bindings="offline_c_learning_agent.actor_loss.bc_loss=False" \
-    --gin_bindings="offline_c_learning_agent.actor_loss.advantage_weighted_loss=True" \
+    --gin_bindings="offline_c_learning_agent.actor_loss.aw_loss=True" \
     --gin_bindings="offline_c_learning_agent.critic_loss.policy_ratio=False" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_umaze_v1/$seed \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_umaze_v1/$seed/stream.log 2>&1 & \
