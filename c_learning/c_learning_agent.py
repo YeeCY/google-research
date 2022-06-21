@@ -548,50 +548,50 @@ class CLearningAgent(tf_agent.TFAgent):
                 name='C2 / (1 - C2)',
                 data=tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2)),
                 step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='next C1 / (1 - C1)',
-                data=tf.reduce_mean(pred_td_targets1[:num_next] / (1 - pred_td_targets1[:num_next])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='next C2 / (1 - C2)',
-                data=tf.reduce_mean(pred_td_targets2[:num_next] / (1 - pred_td_targets2[:num_next])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='future C1 / (1 - C1)',
-                data=tf.reduce_mean(
-                    pred_td_targets1[num_next:num_next + num_future] /
-                    (1 - pred_td_targets1[num_next:num_next + num_future])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='future C2 / (1 - C2)',
-                data=tf.reduce_mean(
-                    pred_td_targets2[num_next:num_next + num_future] /
-                    (1 - pred_td_targets2[num_next:num_next + num_future])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='random C1 / (1 - C1)',
-                data=tf.reduce_mean(pred_td_targets1[half_batch:] / (1 - pred_td_targets1[half_batch:])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='random C2 / (1 - C2)',
-                data=tf.reduce_mean(pred_td_targets2[half_batch:] / (1 - pred_td_targets2[half_batch:])),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='C1 / (1 - C1) is NAN',
-                data=tf.math.is_nan(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='C2 / (1 - C2) is NAN',
-                data=tf.math.is_nan(tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2))),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='C1 / (1 - C1) is inf',
-                data=tf.math.is_inf(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
-                step=self.train_step_counter)
-            tf.compat.v2.summary.scalar(
-                name='C2 / (1 - C2) is inf',
-                data=tf.math.is_inf(tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2))),
-                step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='next C1 / (1 - C1)',
+            #     data=tf.reduce_mean(pred_td_targets1[:num_next] / (1 - pred_td_targets1[:num_next])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='next C2 / (1 - C2)',
+            #     data=tf.reduce_mean(pred_td_targets2[:num_next] / (1 - pred_td_targets2[:num_next])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='future C1 / (1 - C1)',
+            #     data=tf.reduce_mean(
+            #         pred_td_targets1[num_next:num_next + num_future] /
+            #         (1 - pred_td_targets1[num_next:num_next + num_future])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='future C2 / (1 - C2)',
+            #     data=tf.reduce_mean(
+            #         pred_td_targets2[num_next:num_next + num_future] /
+            #         (1 - pred_td_targets2[num_next:num_next + num_future])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='random C1 / (1 - C1)',
+            #     data=tf.reduce_mean(pred_td_targets1[half_batch:] / (1 - pred_td_targets1[half_batch:])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='random C2 / (1 - C2)',
+            #     data=tf.reduce_mean(pred_td_targets2[half_batch:] / (1 - pred_td_targets2[half_batch:])),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='C1 / (1 - C1) is NAN',
+            #     data=tf.math.is_nan(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='C2 / (1 - C2) is NAN',
+            #     data=tf.math.is_nan(tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2))),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='C1 / (1 - C1) is inf',
+            #     data=tf.math.is_inf(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
+            #     step=self.train_step_counter)
+            # tf.compat.v2.summary.scalar(
+            #     name='C2 / (1 - C2) is inf',
+            #     data=tf.math.is_inf(tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2))),
+            #     step=self.train_step_counter)
 
             return critic_loss
 
