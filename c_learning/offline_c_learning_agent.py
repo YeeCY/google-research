@@ -782,7 +782,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                    bc_loss=False,
                    bc_lambda=0.25,
                    aw_loss=False,
-                   aw_lambda=0.05):
+                   aw_lambda=0.5):
         """Computes the actor_loss for C-learning training.
 
         Args:
