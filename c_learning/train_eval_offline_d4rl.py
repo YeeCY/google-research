@@ -75,6 +75,7 @@ def bce_loss(y_true, y_pred, label_smoothing=0):
 def train_eval_offline(
         root_dir,
         env_name='sawyer_reach',
+        agent='offline_c_learning_agent',
         num_iterations=3000000,
         actor_fc_layers=(256, 256),
         critic_obs_fc_layers=None,
@@ -164,43 +165,47 @@ def train_eval_offline(
         #         learning_rate=behavioral_cloning_learning_rate)
         # )
 
-        # tf_agent = c_learning_agent.CLearningAgent(
-        #     time_step_spec,
-        #     action_spec,
-        #     actor_network=actor_net,
-        #     critic_network=critic_net,
-        #     actor_optimizer=tf.compat.v1.train.AdamOptimizer(
-        #         learning_rate=actor_learning_rate),
-        #     critic_optimizer=tf.compat.v1.train.AdamOptimizer(
-        #         learning_rate=critic_learning_rate),
-        #     target_update_tau=target_update_tau,
-        #     target_update_period=target_update_period,
-        #     td_errors_loss_fn=bce_loss,
-        #     gamma=gamma,
-        #     gradient_clipping=gradient_clipping,
-        #     debug_summaries=debug_summaries,
-        #     summarize_grads_and_vars=summarize_grads_and_vars,
-        #     train_step_counter=global_step)
-        tf_agent = offline_c_learning_agent.OfflineCLearningAgent(
-            time_step_spec,
-            action_spec,
-            actor_network=actor_net,
-            critic_network=critic_net,
-            behavioral_cloning_network=behavioral_cloning_net,
-            actor_optimizer=tf.compat.v1.train.AdamOptimizer(
-                learning_rate=actor_learning_rate),
-            critic_optimizer=tf.compat.v1.train.AdamOptimizer(
-                learning_rate=critic_learning_rate),
-            behavioral_cloning_optimizer=tf.compat.v1.train.AdamOptimizer(
-                learning_rate=critic_learning_rate),
-            target_update_tau=target_update_tau,
-            target_update_period=target_update_period,
-            td_errors_loss_fn=bce_loss,
-            gamma=gamma,
-            gradient_clipping=gradient_clipping,
-            debug_summaries=debug_summaries,
-            summarize_grads_and_vars=summarize_grads_and_vars,
-            train_step_counter=global_step)
+        if agent == 'c_learning_agent':
+            tf_agent = c_learning_agent.CLearningAgent(
+                time_step_spec,
+                action_spec,
+                actor_network=actor_net,
+                critic_network=critic_net,
+                actor_optimizer=tf.compat.v1.train.AdamOptimizer(
+                    learning_rate=actor_learning_rate),
+                critic_optimizer=tf.compat.v1.train.AdamOptimizer(
+                    learning_rate=critic_learning_rate),
+                target_update_tau=target_update_tau,
+                target_update_period=target_update_period,
+                td_errors_loss_fn=bce_loss,
+                gamma=gamma,
+                gradient_clipping=gradient_clipping,
+                debug_summaries=debug_summaries,
+                summarize_grads_and_vars=summarize_grads_and_vars,
+                train_step_counter=global_step)
+        elif agent == 'offline_c_learning_agent':
+            tf_agent = offline_c_learning_agent.OfflineCLearningAgent(
+                time_step_spec,
+                action_spec,
+                actor_network=actor_net,
+                critic_network=critic_net,
+                behavioral_cloning_network=behavioral_cloning_net,
+                actor_optimizer=tf.compat.v1.train.AdamOptimizer(
+                    learning_rate=actor_learning_rate),
+                critic_optimizer=tf.compat.v1.train.AdamOptimizer(
+                    learning_rate=critic_learning_rate),
+                behavioral_cloning_optimizer=tf.compat.v1.train.AdamOptimizer(
+                    learning_rate=behavioral_cloning_learning_rate),
+                target_update_tau=target_update_tau,
+                target_update_period=target_update_period,
+                td_errors_loss_fn=bce_loss,
+                gamma=gamma,
+                gradient_clipping=gradient_clipping,
+                debug_summaries=debug_summaries,
+                summarize_grads_and_vars=summarize_grads_and_vars,
+                train_step_counter=global_step)
+        else:
+            raise RuntimeError("Unknown agent: {}".format(agent))
         tf_agent.initialize()
 
         eval_summary_writer = tf.compat.v2.summary.create_file_writer(

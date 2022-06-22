@@ -14,7 +14,8 @@ declare -a seeds=(1)
 for seed in "${seeds[@]}"; do
   mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/sawyer_reach_600k/$seed
   nohup \
-  python $PROJECT_DIR/train_eval_offline.py \
+  python $PROJECT_DIR/train_eval_offline_d4rl.py \
+    --gin_bindings="train_eval_offline.agent='c_learning_agent'" \
     --gin_bindings="train_eval.env_name='sawyer_reach'" \
     --gin_bindings="train_eval.random_seed=${seed}" \
     --gin_bindings="train_eval.num_iterations=600000" \

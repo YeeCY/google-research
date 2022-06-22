@@ -16,7 +16,8 @@ for seed in "${seeds[@]}"; do
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
   mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_umaze_v1/$seed
   nohup \
-  python $PROJECT_DIR/train_eval_offline.py \
+  python $PROJECT_DIR/train_eval_offline_d4rl.py \
+    --gin_bindings="train_eval_offline.agent='c_learning_agent'" \
     --gin_bindings="train_eval_offline.env_name='maze2d-umaze-v1'" \
     --gin_bindings="train_eval_offline.random_seed=${seed}" \
     --gin_bindings="train_eval_offline.num_iterations=1000000" \
