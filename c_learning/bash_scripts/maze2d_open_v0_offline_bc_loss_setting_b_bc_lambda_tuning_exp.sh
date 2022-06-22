@@ -16,7 +16,7 @@ declare -a seeds=(0)
 for bc_lambda in "${all_bc_lambdas[@]}"; do
   for seed in "${seeds[@]}"; do
     rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
-    mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed
+    mkdir -p ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0_bc_lambda="${bc_lambda}"/$seed
     nohup \
     python $PROJECT_DIR/train_eval_offline_d4rl.py \
       --gin_bindings="train_eval_offline.env_name='maze2d-open-v0'" \
@@ -32,8 +32,8 @@ for bc_lambda in "${all_bc_lambdas[@]}"; do
       --gin_bindings="offline_c_learning_agent.actor_loss.bc_loss=True" \
       --gin_bindings="offline_c_learning_agent.actor_loss.bc_lambda=${bc_lambda}" \
       --gin_bindings="offline_c_learning_agent.critic_loss.policy_ratio=False" \
-      --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed \
-    > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed/stream.log 2>&1 & \
+      --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0_bc_lambda="${bc_lambda}"/$seed \
+    > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0_bc_lambda="${bc_lambda}"/$seed/stream.log 2>&1 & \
     sleep 2
   done
 done
