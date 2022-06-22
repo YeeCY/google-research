@@ -68,7 +68,7 @@ def bce_loss(y_true, y_pred, label_smoothing=0):
 
 
 @gin.configurable
-def train_eval(
+def train_eval_offline(
         root_dir,
         dataset_dir,
         env_name='sawyer_reach',
@@ -291,14 +291,14 @@ def train_eval(
             replay_buffer=replay_buffer)
         replay_buffer_checkpointer.initialize_or_restore()
 
-        # create train checkpointer
-        train_checkpointer = common.Checkpointer(
-            ckpt_dir=train_dir,
-            agent=tf_agent,
-            global_step=global_step,
-            metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
-            max_to_keep=None)
-        train_checkpointer.initialize_or_restore()
+        # # create train checkpointer
+        # train_checkpointer = common.Checkpointer(
+        #     ckpt_dir=train_dir,
+        #     agent=tf_agent,
+        #     global_step=global_step,
+        #     metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
+        #     max_to_keep=None)
+        # train_checkpointer.initialize_or_restore()
 
         # replay_observer = [replay_buffer.add_batch]
         #
@@ -426,8 +426,8 @@ def train_eval(
                 )
                 metric_utils.log_metrics(eval_metrics)
 
-            if global_step_val % train_checkpoint_interval == 0:
-                train_checkpointer.save(global_step=global_step_val)
+            # if global_step_val % train_checkpoint_interval == 0:
+            #     train_checkpointer.save(global_step=global_step_val)
 
         return train_loss
 
@@ -440,7 +440,7 @@ def main(_):
     gin.parse_config_files_and_bindings(FLAGS.gin_file, FLAGS.gin_bindings)
     root_dir = FLAGS.root_dir
     dataset_dir = FLAGS.dataset_dir
-    train_eval(root_dir, dataset_dir)
+    train_eval_offline(root_dir, dataset_dir)
 
 
 if __name__ == '__main__':
