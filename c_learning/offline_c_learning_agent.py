@@ -687,10 +687,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                     next_time_steps.reward == CLearningReward.RANDOM.value, tf.float32)
 
                 critic_loss1 = -next_mask * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
-                               random_mask * w * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
+                               random_mask * w * gamma * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
                                random_mask * tf.math.log(1 - pred_td_neg_targets1 + EPSILON)
                 critic_loss2 = -next_mask * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
-                               random_mask * w * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
+                               random_mask * w * gamma * tf.math.log(pred_td_pos_targets2 + EPSILON) - \
                                random_mask * tf.math.log(1 - pred_td_neg_targets2 + EPSILON)
             else:
                 raise NotImplementedError
