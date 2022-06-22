@@ -26,7 +26,6 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.utils import common
 from tf_agents.utils import nest_utils
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
-from tf_agents.agents.behavioral_cloning import behavioral_cloning_agent
 
 
 class CLearningReward(enum.Enum):

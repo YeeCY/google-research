@@ -394,7 +394,10 @@ def train_eval_offline(
             # initial_collect_driver.run = common.function(initial_collect_driver.run)
             # collect_driver.run = common.function(collect_driver.run)
             tf_agent.train = common.function(tf_agent.train)
-            # c_learning_utils.offline_goal_fn = common.function(c_learning_utils.offline_goal_fn)
+            # if agent == 'c_learning_agent':
+            #     c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
+            # else:
+            #     c_learning_utils.offline_goal_fn = common.function(c_learning_utils.offline_goal_fn)
 
         # Save the hyperparameters
         operative_filename = os.path.join(root_dir, 'operative.gin')
@@ -436,12 +439,20 @@ def train_eval_offline(
             num_steps=max_future_steps)
         dataset = dataset.unbatch().filter(_filter_invalid_transition)
         dataset = dataset.batch(batch_size, drop_remainder=True)
-        offline_goal_fn = functools.partial(
-            c_learning_utils.offline_goal_fn,
-            batch_size=batch_size,
-            obs_dim=obs_dim,
-            gamma=gamma)
-        dataset = dataset.map(offline_goal_fn)
+        if agent == 'c_learning_agent':
+            goal_fn = functools.partial(
+                c_learning_utils.goal_fn,
+                batch_size=batch_size,
+                obs_dim=obs_dim,
+                gamma=gamma)
+            dataset = dataset.map(goal_fn)
+        else:
+            offline_goal_fn = functools.partial(
+                c_learning_utils.offline_goal_fn,
+                batch_size=batch_size,
+                obs_dim=obs_dim,
+                gamma=gamma)
+            dataset = dataset.map(offline_goal_fn)
         dataset = dataset.prefetch(5)
         iterator = iter(dataset)
 
