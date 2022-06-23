@@ -209,9 +209,9 @@ def load_antmaze_large_diverse_v2():
     return tf_py_environment.TFPyEnvironment(env)
 
 
-def load_metaworld(env_name):
+def load_metaworld(env_name, seed=None):
     goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[env_name + "-goal-observable"]
-    gym_env = goal_observable_cls()
+    gym_env = goal_observable_cls(seed)
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=gym_env.max_path_length,
@@ -220,7 +220,7 @@ def load_metaworld(env_name):
     return tf_py_environment.TFPyEnvironment(env)
 
 
-def load(env_name):
+def load(env_name, seed=None):
     """Creates the training and evaluation environment.
 
     This method automatically detects whether we are using a subset of the
@@ -274,8 +274,8 @@ def load(env_name):
         eval_tf_env = load_antmaze_large_diverse_v2()
     elif env_name.startswith('metaworld'):
         env_name_ = env_name.split('.')[-1]
-        tf_env = load_metaworld(env_name_)
-        eval_tf_env = load_metaworld(env_name_)
+        tf_env = load_metaworld(env_name_, seed=seed)
+        eval_tf_env = load_metaworld(env_name_, seed=seed)
     else:
         raise NotImplementedError('Unsupported environment: %s' % env_name)
     assert len(tf_env.envs) == 1

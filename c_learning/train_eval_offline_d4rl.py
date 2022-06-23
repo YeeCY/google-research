@@ -127,7 +127,7 @@ def train_eval_offline(
     global_step = tf.compat.v1.train.get_or_create_global_step()
     with tf.compat.v2.summary.record_if(
             lambda: tf.math.equal(global_step % summary_interval, 0)):
-        tf_env, eval_tf_env, obs_dim = c_learning_envs.load(env_name)
+        tf_env, eval_tf_env, obs_dim = c_learning_envs.load(env_name, seed=random_seed)
 
         time_step_spec = tf_env.time_step_spec()
         observation_spec = time_step_spec.observation
