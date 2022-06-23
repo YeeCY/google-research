@@ -78,6 +78,9 @@ def vis_policy(
     save_dir = os.path.expanduser(save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
+    if env_name.startswith('metaworld'):
+        env_name = env_name.replace('-', '.', 1)
+
     _, eval_tf_env, obs_dim = c_learning_envs.load(env_name, seed=random_seed)
     eval_py_env = eval_tf_env.pyenv.envs[0]
 
