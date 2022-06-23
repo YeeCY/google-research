@@ -22,6 +22,7 @@ from __future__ import print_function
 import functools
 import os
 import time
+import pickle
 
 from absl import app
 from absl import flags
@@ -43,6 +44,7 @@ from tf_agents.policies import greedy_policy
 from tf_agents.policies import random_tf_policy
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.utils import common
+from tf_agents import trajectories
 
 # limit gpu memory usage
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -281,15 +283,36 @@ def train_eval_offline(
         # train_checkpointer.initialize_or_restore()
 
         # (chongyiz): restore replay buffer
-        replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
-            data_spec=tf_agent.collect_data_spec,
-            batch_size=tf_env.batch_size,
-            max_length=replay_buffer_capacity)
+        if env_name.startswith('metaworld'):
+            start_time = time.time()
+            with open(os.path.join(dataset_dir, 'params.pkl'), 'rb') as f:
+                snapshot = pickle.load(f)
 
-        replay_buffer_checkpointer = common.Checkpointer(
-            ckpt_dir=dataset_dir,
-            replay_buffer=replay_buffer)
-        replay_buffer_checkpointer.initialize_or_restore()
+            path_buffer = snapshot['replay_buffer']
+
+            replay_buffer = c_learning_utils.TFUniformReplayBuffer(
+                data_spec=tf_agent.collect_data_spec,
+                batch_size=tf_env.batch_size,
+                max_length=replay_buffer_capacity)
+            # (chongyiz): we use d4rl function to sequence the dataset
+            for traj in c_learning_utils.sequence_dataset(
+                    path_buffer, tf_env.pyenv.envs[0].max_path_length):
+                episode = trajectories.trajectory.from_episode(
+                    observation=traj['observation'].astype(np.float32), policy_info=(),
+                    action=traj['action'].astype(np.float32), reward=traj['reward'].astype(np.float32))
+                replay_buffer.add_episode(episode)
+            end_time = time.time()
+            logging.info("Time to load {} frames: {} sec".format(replay_buffer.num_frames(), end_time - start_time))
+        else:
+            replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
+                data_spec=tf_agent.collect_data_spec,
+                batch_size=tf_env.batch_size,
+                max_length=replay_buffer_capacity)
+
+            replay_buffer_checkpointer = common.Checkpointer(
+                ckpt_dir=dataset_dir,
+                replay_buffer=replay_buffer)
+            replay_buffer_checkpointer.initialize_or_restore()
 
         # # create train checkpointer
         # train_checkpointer = common.Checkpointer(

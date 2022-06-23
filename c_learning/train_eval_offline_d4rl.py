@@ -308,7 +308,6 @@ def train_eval_offline(
             np.arange(obs_dim),
             np.arange(obs_dim + start_index, obs_dim + end_index)
         ])
-        import time
         start_time = time.time()
         for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
             episode = trajectories.trajectory.from_episode(

@@ -16,6 +16,7 @@
 """Helper functions for C-learning."""
 
 import enum
+import collections
 import numpy as np
 
 import gin
@@ -336,6 +337,30 @@ def offline_goal_fn(experience,
         reward=reward,
     )
     return experience, buffer_info
+
+
+def sequence_dataset(path_buffer, max_path_length):
+    dataset = path_buffer._buffer
+    N = path_buffer.n_transitions_stored
+    data_ = collections.defaultdict(list)
+
+    episode_step = 0
+    for i in range(N):
+        done_bool = bool(dataset['terminal'][i])
+        final_timestep = (episode_step == max_path_length - 1)
+
+        for k in dataset:
+            data_[k].append(np.squeeze(dataset[k][i]))
+
+        if done_bool or final_timestep:
+            episode_step = 0
+            episode_data = {}
+            for k in data_:
+                episode_data[k] = np.array(data_[k])
+            yield episode_data
+            data_ = collections.defaultdict(list)
+
+        episode_step += 1
 
 
 @gin.configurable
