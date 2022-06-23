@@ -66,11 +66,10 @@ def vis_policy(
         critic_obs_fc_layers=None,
         critic_action_fc_layers=None,
         critic_joint_fc_layers=(256, 256),
-        num_episodes=10,
+        num_episodes=5,
         random_seed=0,
         actor_std=None,
 ):
-    """A simple train and eval for SAC."""
     np.random.seed(random_seed)
     tf.random.set_seed(random_seed)
 
@@ -79,7 +78,7 @@ def vis_policy(
     save_dir = os.path.expanduser(save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
-    _, eval_tf_env, obs_dim = c_learning_envs.load(env_name)
+    _, eval_tf_env, obs_dim = c_learning_envs.load(env_name, seed=random_seed)
     eval_py_env = eval_tf_env.pyenv.envs[0]
 
     time_step_spec = eval_tf_env.time_step_spec()
