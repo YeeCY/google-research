@@ -241,23 +241,6 @@ def train_eval_offline(
                 batch_size=tf_env.batch_size,
                 obs_dim=obs_dim),
         ]
-        if env_name.startswith('metaworld'):
-            eval_metrics.extend([
-                c_learning_utils.FinalSuccessRate(
-                    buffer_size=num_eval_episodes, obs_dim=obs_dim),
-                c_learning_utils.AverageSuccessRate(
-                    buffer_size=num_eval_episodes, obs_dim=obs_dim),
-            ])
-            train_metrics.extend([
-                c_learning_utils.FinalSuccessRate(
-                    buffer_size=num_eval_episodes,
-                    batch_size=tf_env.batch_size,
-                    obs_dim=obs_dim),
-                c_learning_utils.AverageSuccessRate(
-                    buffer_size=num_eval_episodes,
-                    batch_size=tf_env.batch_size,
-                    obs_dim=obs_dim),
-            ])
 
         if log_subset is not None:
             start_index, end_index = log_subset
@@ -292,23 +275,6 @@ def train_eval_offline(
                         end_index=end_index,
                         name='SubsetDeltaDistance'),
                 ])
-                if env_name.startswith('metaworld'):
-                    metrics.extend([
-                        c_learning_utils.FinalSuccessRate(
-                            buffer_size=num_eval_episodes,
-                            batch_size=tf_env.batch_size if name == 'train' else 10,
-                            obs_dim=obs_dim,
-                            start_index=start_index,
-                            end_index=end_index,
-                            name='SubsetFinalSuccessRate'),
-                        c_learning_utils.AverageSuccessRate(
-                            buffer_size=num_eval_episodes,
-                            batch_size=tf_env.batch_size if name == 'train' else 10,
-                            obs_dim=obs_dim,
-                            start_index=start_index,
-                            end_index=end_index,
-                            name='SubsetAverageSuccessRate'),
-                    ])
 
         eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
         # initial_collect_policy = random_tf_policy.RandomTFPolicy(
@@ -333,15 +299,16 @@ def train_eval_offline(
         # TODO (chongyiz): construct offline dataset
         try:
             start_index = gin.query_parameter('obs_to_goal.start_index')
+            assert len(start_index) == 1
+            start_index = start_index[0]
         except ValueError:
             start_index = 0
         try:
             end_index = gin.query_parameter('obs_to_goal.end_index')
+            assert len(end_index) == 1
+            end_index = end_index[0]
         except ValueError:
             end_index = obs_dim
-        if env_name.startswith('metaworld'):
-            start_index = 0
-            end_index = 3
 
         indices = np.concatenate([
             np.arange(obs_dim),

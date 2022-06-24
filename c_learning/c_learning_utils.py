@@ -111,11 +111,14 @@ def get_last_goals(observation, discount):
 
 
 @gin.configurable
-def obs_to_goal(obs, start_index=0, end_index=None):
-    if end_index is None:
-        return obs[:, start_index:]
-    else:
-        return obs[:, start_index:end_index]
+def obs_to_goal(obs, start_index=(0,), end_index=(None,)):
+    goal = []
+    for start_idx, end_idx in zip(start_index, end_index):
+        if end_index is None:
+            goal.append(obs[:, start_idx:])
+        else:
+            goal.append(obs[:, start_idx:end_idx])
+    return tf.concat(goal, axis=-1)
 
 
 @gin.configurable
@@ -408,8 +411,8 @@ class BaseDistanceMetric(tf_metric.TFStepMetric):
                  batch_size=1,
                  buffer_size=10,
                  obs_dim=None,
-                 start_index=0,
-                 end_index=None,
+                 start_index=(0,),
+                 end_index=(None,),
                  name=None):
         assert obs_dim is not None
         self._start_index = start_index
@@ -533,10 +536,10 @@ class BaseSuccessRateMetric(tf_metric.TFStepMetric):
                  prefix='Metrics',
                  dtype=tf.float32,
                  batch_size=1,
-                 buffer_size=100,
+                 buffer_size=10,
                  obs_dim=None,
-                 start_index=0,
-                 end_index=None,
+                 start_index=(0,),
+                 end_index=(None,),
                  name=None):
         assert obs_dim is not None
         self._start_index = start_index
@@ -601,11 +604,40 @@ class MetaWorldWrapper(gym.Wrapper):
         assert isinstance(env, SawyerXYZEnv), f"Invalid environment type: {type(env)}"
         super().__init__(env)
 
+        unwrapped_obs_dim = self.env.observation_space.shape[0]
+        self.observation_space = gym.spaces.Box(
+            low=np.full(unwrapped_obs_dim + 3, -np.inf),
+            high=np.full(unwrapped_obs_dim + 3, np.inf),
+            dtype=np.float32
+        )
+
+    def _augment_obs(self, obs):
+        if 'AssemblyV2' in type(self.env).__name__:
+            obs[-3] += 0.13
+            obs = np.concatenate([
+                obs, self.env._target_pos + np.array([0.13, 0, 0])], dtype=np.float32)
+        else:
+            obs = np.concatenate([obs, self.env._target_pos])
+
+        return obs
+
     def reset(self):
-        return self.env.reset()
+        # return self.env.reset()
+        obs = self.env.reset()
+
+        return self._augment_obs(obs)
 
     def step(self, action):
         obs, _, done, info = self.env.step(action)
         reward = info['success']
 
-        return obs, reward, done, info
+        # drawer-open-v2
+        # if 'AssemblyV2' in type(self.env).__name__:
+        #     return np.zero()
+        #     obs[-3] += 0.13
+        #     obs = np.concatenate([
+        #         obs, self.env._target_pos + np.array([0.13, 0, 0])], dtype=np.float32)
+        # else:
+        #     obs = np.concatenate([obs, self.env._target_pos])
+
+        return self._augment_obs(obs), reward, done, info

@@ -252,56 +252,56 @@ def train_eval_offline(
                     obs_dim=obs_dim),
             ])
 
-        if log_subset is not None:
-            start_index, end_index = log_subset
-            for name, metrics in [('train', train_metrics), ('eval', eval_metrics)]:
-                metrics.extend([
-                    c_learning_utils.InitialDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetInitialDistance'),
-                    c_learning_utils.FinalDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetFinalDistance'),
-                    c_learning_utils.MinimumDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetMinimumDistance'),
-                    c_learning_utils.DeltaDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetDeltaDistance'),
-                ])
-                if env_name.startswith('metaworld'):
-                    metrics.extend([
-                        c_learning_utils.FinalSuccessRate(
-                            buffer_size=num_eval_episodes,
-                            batch_size=tf_env.batch_size if name == 'train' else 10,
-                            obs_dim=obs_dim,
-                            start_index=start_index,
-                            end_index=end_index,
-                            name='SubsetFinalSuccessRate'),
-                        c_learning_utils.AverageSuccessRate(
-                            buffer_size=num_eval_episodes,
-                            batch_size=tf_env.batch_size if name == 'train' else 10,
-                            obs_dim=obs_dim,
-                            start_index=start_index,
-                            end_index=end_index,
-                            name='SubsetAverageSuccessRate'),
-                    ])
+        # if log_subset is not None:
+        #     start_index, end_index = log_subset
+        #     for name, metrics in [('train', train_metrics), ('eval', eval_metrics)]:
+        #         metrics.extend([
+        #             c_learning_utils.InitialDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetInitialDistance'),
+        #             c_learning_utils.FinalDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetFinalDistance'),
+        #             c_learning_utils.MinimumDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetMinimumDistance'),
+        #             c_learning_utils.DeltaDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetDeltaDistance'),
+        #         ])
+        #         if env_name.startswith('metaworld'):
+        #             metrics.extend([
+        #                 c_learning_utils.FinalSuccessRate(
+        #                     buffer_size=num_eval_episodes,
+        #                     batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                     obs_dim=obs_dim,
+        #                     start_index=start_index,
+        #                     end_index=end_index,
+        #                     name='SubsetFinalSuccessRate'),
+        #                 c_learning_utils.AverageSuccessRate(
+        #                     buffer_size=num_eval_episodes,
+        #                     batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                     obs_dim=obs_dim,
+        #                     start_index=start_index,
+        #                     end_index=end_index,
+        #                     name='SubsetAverageSuccessRate'),
+        #             ])
 
         eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
         # initial_collect_policy = random_tf_policy.RandomTFPolicy(

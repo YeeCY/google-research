@@ -31,7 +31,10 @@ from d4rl.offline_env import download_dataset_from_url, get_keys
 from d4rl import pointmaze
 from d4rl import locomotion
 
+import gym
+import mujoco_py
 from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from metaworld.envs.mujoco import sawyer_xyz
 
 from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
@@ -288,7 +291,7 @@ def load(env_name, seed=None):
     # code modifies the environment observation to include the full state but only
     # the user-specified dimensions of the goal state.
     if env_name.startswith('metaworld'):
-        obs_dim = tf_env.observation_spec().shape[0] - 3
+        obs_dim = tf_env.observation_spec().shape[0] - 6
     else:
         obs_dim = tf_env.observation_spec().shape[0] // 2
     try:
@@ -305,7 +308,7 @@ def load(env_name, seed=None):
     # (chongyiz): hardcoded index
     if env_name.startswith('metaworld'):
         start_index = 0
-        end_index = 3
+        end_index = 6
 
     indices = np.concatenate([
         np.arange(obs_dim),

@@ -314,6 +314,7 @@ def train_eval(
             collect_driver.run = common.function(collect_driver.run)
             tf_agent.train = common.function(tf_agent.train)
             # c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
+            c_learning_utils.obs_to_goal = common.function(c_learning_utils.obs_to_goal)
 
         # Save the hyperparameters
         operative_filename = os.path.join(root_dir, 'operative.gin')
