@@ -296,10 +296,14 @@ def load(env_name, seed=None):
         obs_dim = tf_env.observation_spec().shape[0] // 2
     try:
         start_index = gin.query_parameter('obs_to_goal.start_index')
+        assert len(start_index) == 1
+        start_index = start_index[0]
     except ValueError:
         start_index = 0
     try:
         end_index = gin.query_parameter('obs_to_goal.end_index')
+        assert len(end_index) == 1
+        end_index = end_index[0]
     except ValueError:
         end_index = None
     if end_index is None:
