@@ -196,6 +196,24 @@ def train_eval(
                 batch_size=tf_env.batch_size,
                 obs_dim=obs_dim),
         ]
+        if env_name.startswith('metaworld'):
+            eval_metrics.extend([
+                c_learning_utils.FinalSuccessRate(
+                    buffer_size=num_eval_episodes, obs_dim=obs_dim),
+                c_learning_utils.AverageSuccessRate(
+                    buffer_size=num_eval_episodes, obs_dim=obs_dim),
+            ])
+            train_metrics.extend([
+                c_learning_utils.FinalSuccessRate(
+                    buffer_size=num_eval_episodes,
+                    batch_size=tf_env.batch_size,
+                    obs_dim=obs_dim),
+                c_learning_utils.AverageSuccessRate(
+                    buffer_size=num_eval_episodes,
+                    batch_size=tf_env.batch_size,
+                    obs_dim=obs_dim),
+            ])
+
         if log_subset is not None:
             start_index, end_index = log_subset
             for name, metrics in [('train', train_metrics), ('eval', eval_metrics)]:
@@ -229,6 +247,23 @@ def train_eval(
                         end_index=end_index,
                         name='SubsetDeltaDistance'),
                 ])
+                if env_name.startswith('metaworld'):
+                    metrics.extend([
+                        c_learning_utils.FinalSuccessRate(
+                            buffer_size=num_eval_episodes,
+                            batch_size=tf_env.batch_size if name == 'train' else 10,
+                            obs_dim=obs_dim,
+                            start_index=start_index,
+                            end_index=end_index,
+                            name='SubsetFinalSuccessRate'),
+                        c_learning_utils.AverageSuccessRate(
+                            buffer_size=num_eval_episodes,
+                            batch_size=tf_env.batch_size if name == 'train' else 10,
+                            obs_dim=obs_dim,
+                            start_index=start_index,
+                            end_index=end_index,
+                            name='SubsetAverageSuccessRate'),
+                    ])
 
         eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
         initial_collect_policy = random_tf_policy.RandomTFPolicy(
@@ -297,16 +332,17 @@ def train_eval(
         # train_checkpointer.save(global_step=global_step.numpy())
         # exit()
 
-        metric_utils.eager_compute(
-            eval_metrics,
-            eval_tf_env,
-            eval_policy,
-            num_episodes=num_eval_episodes,
-            train_step=global_step,
-            summary_writer=eval_summary_writer,
-            summary_prefix='Metrics',
-        )
-        metric_utils.log_metrics(eval_metrics)
+        if not FLAGS.run_eagerly:
+            metric_utils.eager_compute(
+                eval_metrics,
+                eval_tf_env,
+                eval_policy,
+                num_episodes=num_eval_episodes,
+                train_step=global_step,
+                summary_writer=eval_summary_writer,
+                summary_prefix='Metrics',
+            )
+            metric_utils.log_metrics(eval_metrics)
 
         time_step = None
         policy_state = collect_policy.get_initial_state(tf_env.batch_size)

@@ -1,3 +1,4 @@
+from absl import app
 from absl import flags
 
 import numpy as np
@@ -10,7 +11,7 @@ flags.DEFINE_string('env_name', 'reach-v2', 'Name of metaworld task.')
 FLAGS = flags.FLAGS
 
 
-def main():
+def main(_):
     # door_open_goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE["door-open-v2-goal-observable"]
     # door_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN["door-open-v2-goal-hidden"]
     # reach_goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE["reach-v2-goal-observable"]
@@ -53,4 +54,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app.run(main)

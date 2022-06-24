@@ -17,7 +17,9 @@
 
 import enum
 import collections
+
 import numpy as np
+import gym
 
 import gin
 import tensorflow as tf
@@ -27,6 +29,8 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.utils import common
 from tf_agents.utils import nest_utils
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
+
+from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import SawyerXYZEnv
 
 
 class CLearningReward(enum.Enum):
@@ -522,3 +526,86 @@ class TFUniformReplayBuffer(tf_uniform_replay_buffer.TFUniformReplayBuffer):
             write_id_op = self._id_table.write(write_rows, ids)
             write_data_op = self._data_table.write(write_rows, episode_items)
             return tf.group(write_id_op, write_data_op)
+
+
+class BaseSuccessRateMetric(tf_metric.TFStepMetric):
+    def __init__(self,
+                 prefix='Metrics',
+                 dtype=tf.float32,
+                 batch_size=1,
+                 buffer_size=100,
+                 obs_dim=None,
+                 start_index=0,
+                 end_index=None,
+                 name=None):
+        assert obs_dim is not None
+        self._start_index = start_index
+        self._end_index = end_index
+        self._obs_dim = obs_dim
+        name = self.NAME if name is None else name
+        super(BaseSuccessRateMetric, self).__init__(name=name, prefix=prefix)
+        self._buffer = tf_metrics.TFDeque(buffer_size, dtype)
+        self._success_buffer = tf_metrics.TFDeque(
+            1000, dtype)  # Episodes should have length less than 1k
+        self.dtype = dtype
+
+    @common.function(autograph=True)
+    def call(self, trajectory):
+        # obs = trajectory.observation
+        # s = obs[:, :self._obs_dim]
+        # g = obs[:, self._obs_dim:]
+        # dist_to_goal = tf.norm(
+        #     obs_to_goal(obs_to_goal(s), self._start_index, self._end_index) -
+        #     obs_to_goal(g, self._start_index, self._end_index),
+        #     axis=1)
+        success = trajectory.reward
+        tf.assert_equal(tf.shape(success)[0], 1)
+        if trajectory.is_mid():
+            self._success_buffer.extend(success)
+        if trajectory.is_last()[0] and self._success_buffer.length > 0:
+            self._update_buffer()
+            self._success_buffer.clear()
+        return trajectory
+
+    def result(self):
+        return self._buffer.mean()
+
+    @common.function
+    def reset(self):
+        self._buffer.clear()
+
+    def _update_buffer(self):
+        raise NotImplementedError
+
+
+class FinalSuccessRate(BaseSuccessRateMetric):
+    """Computes the final success rate."""
+    NAME = 'FinalSuccessRate'
+
+    def _update_buffer(self):
+        final_success_rate = self._success_buffer.data[-1]
+        self._buffer.add(final_success_rate)
+
+
+class AverageSuccessRate(BaseSuccessRateMetric):
+    """Computes the average success rate."""
+    NAME = 'AverageSuccessRate'
+
+    def _update_buffer(self):
+        avg_success_rate = self._success_buffer.mean()
+        self._buffer.add(avg_success_rate)
+
+
+class MetaWorldWrapper(gym.Wrapper):
+    def __init__(self, env):
+        assert isinstance(env, SawyerXYZEnv), f"Invalid environment type: {type(env)}"
+        super().__init__(env)
+
+    def reset(self):
+        return self.env.reset()
+
+    def step(self, action):
+        obs, _, done, info = self.env.step(action)
+        reward = info['success']
+
+        return obs, reward, done, info

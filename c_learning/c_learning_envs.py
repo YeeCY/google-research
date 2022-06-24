@@ -23,9 +23,6 @@ import os
 
 from absl import logging
 import gin
-import gym
-from metaworld.envs.mujoco import sawyer_xyz
-import mujoco_py
 import numpy as np
 import h5py
 from tqdm import tqdm
@@ -41,6 +38,8 @@ from tf_agents.environments import tf_py_environment
 from tf_agents.environments import wrappers
 
 import antmaze_env
+import c_learning_utils
+
 
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
@@ -212,6 +211,8 @@ def load_antmaze_large_diverse_v2():
 def load_metaworld(env_name, seed=None):
     goal_observable_cls = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[env_name + "-goal-observable"]
     gym_env = goal_observable_cls(seed)
+    gym_env = c_learning_utils.MetaWorldWrapper(gym_env)
+
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=gym_env.max_path_length,
@@ -299,10 +300,12 @@ def load(env_name, seed=None):
     except ValueError:
         end_index = None
     if end_index is None:
-        if env_name.startswith('metaworld'):
-            end_index = 3
-        else:
-            end_index = obs_dim
+        end_index = obs_dim
+
+    # (chongyiz): hardcoded index
+    if env_name.startswith('metaworld'):
+        start_index = 0
+        end_index = 3
 
     indices = np.concatenate([
         np.arange(obs_dim),
