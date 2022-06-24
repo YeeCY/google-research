@@ -22,8 +22,8 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="train_eval_offline.max_future_steps=200" \
     --gin_bindings="train_eval_offline.random_seed=${seed}" \
     --gin_bindings="train_eval_offline.num_iterations=1000000" \
-    --gin_bindings="obs_to_goal.start_index=22" \
-    --gin_bindings="obs_to_goal.end_index=25" \
+    --gin_bindings="obs_to_goal.start_index=(22, 0)" \
+    --gin_bindings="obs_to_goal.end_index=(25, 3)" \
     --gin_bindings="goal_fn.relabel_next_prob=0.5" \
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/metaworld_button_press/$seed \
