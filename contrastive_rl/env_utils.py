@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import os
 
-import ant_env
+import ant_envs
 import fetch_envs
 import gym
 import metaworld
@@ -96,7 +96,7 @@ def load(env_name):
   elif env_name.startswith('ant_'):
     _, map_name = env_name.split('_')
     assert map_name in ['umaze', 'medium', 'large']
-    CLASS = ant_env.AntMaze
+    CLASS = ant_envs.AntMaze
     kwargs['map_name'] = map_name
     kwargs['non_zero_reset'] = True
     if map_name == 'umaze':
