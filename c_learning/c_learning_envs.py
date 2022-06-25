@@ -639,7 +639,7 @@ class Maze2DBase(pointmaze.MazeEnv):
         # (chongyiz): concatenate goals to observations
         assert 'infos/goal' in data_dict
         data_dict['observations'] = np.concatenate([
-            data_dict['observations'], data_dict['infos/goal'], np.zeros([N_samples, 2])], axis=-1)
+            data_dict['observations'][..., :2], data_dict['infos/goal']], axis=-1)
         if self.observation_space.shape is not None:
             assert data_dict['observations'].shape[1:] == self.observation_space.shape, \
                 'Observation shape does not match env: %s vs %s' % (
@@ -665,7 +665,7 @@ class Maze2DBase(pointmaze.MazeEnv):
 
     def _get_obs(self):
         obs = super(Maze2DBase, self)._get_obs()
-        return np.concatenate([obs, self._target, np.zeros(2)], dtype=np.float32)
+        return np.concatenate([obs[:2], self._target], dtype=np.float32)
 
 
 class Maze2DOpenV0(Maze2DBase):
