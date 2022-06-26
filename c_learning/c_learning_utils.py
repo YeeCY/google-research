@@ -606,8 +606,8 @@ class MetaWorldWrapper(gym.Wrapper):
 
         unwrapped_obs_dim = self.env.observation_space.shape[0]
         self.observation_space = gym.spaces.Box(
-            low=np.full(unwrapped_obs_dim + 3, -np.inf),
-            high=np.full(unwrapped_obs_dim + 3, np.inf),
+            low=np.full(12, -np.inf),
+            high=np.full(12, np.inf),
             dtype=np.float32
         )
 
@@ -617,7 +617,10 @@ class MetaWorldWrapper(gym.Wrapper):
             obs = np.concatenate([
                 obs, self.env._target_pos + np.array([0.13, 0, 0])], dtype=np.float32)
         else:
-            obs = np.concatenate([obs, self.env._target_pos])
+            pos_hand = self.env.get_endeff_pos()
+            obj_pos = self.env._get_pos_objects()
+
+            obs = np.concatenate([pos_hand, obj_pos, self.env._target_pos, self.env._target_pos])
 
         return obs
 
