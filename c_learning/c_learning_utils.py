@@ -29,8 +29,8 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.utils import common
 from tf_agents.utils import nest_utils
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
-from tf_agents.environments import PyEnvironmentBaseWrapper
-from tf_agents.specs import BoundedArraySpec
+# from tf_agents.environments import PyEnvironmentBaseWrapper
+# from tf_agents.specs import BoundedArraySpec
 
 from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import SawyerXYZEnv
 
