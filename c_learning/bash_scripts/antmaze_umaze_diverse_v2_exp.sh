@@ -20,10 +20,11 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="train_eval.env_name='antmaze-umaze-diverse-v2'" \
     --gin_bindings="train_eval.random_seed=${seed}" \
     --gin_bindings="train_eval.num_iterations=1000000" \
-    --gin_bindings="obs_to_goal.start_index=0" \
-    --gin_bindings="obs_to_goal.end_index=2" \
-    --gin_bindings="goal_fn.relabel_next_prob=0.3" \
-    --gin_bindings="goal_fn.relabel_future_prob=0.2" \
+    --gin_bindings="train_eval.max_future_steps=250" \
+    --gin_bindings="obs_to_goal.start_index=(0,)" \
+    --gin_bindings="obs_to_goal.end_index=(2,)" \
+    --gin_bindings="goal_fn.relabel_next_prob=0.5" \
+    --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_umaze_diverse_v2/$seed \
   > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/antmaze_umaze_diverse_v2/$seed/stream.log 2>&1 & \
   sleep 2

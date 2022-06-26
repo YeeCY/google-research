@@ -176,11 +176,11 @@ def load_antmaze_umaze_v2():
 
 
 def load_antmaze_umaze_diverse_v2():
-    # gym_env = AntMazeUmazeDiverseV2()
-    gym_env = antmaze_env.AntMaze(
-        'umaze',
-        non_zero_reset=True,
-        dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5')
+    gym_env = AntMazeUmazeDiverseV2()
+    # gym_env = antmaze_env.AntMaze(
+    #     'umaze',
+    #     non_zero_reset=True,
+    #     dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5')
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=701,
@@ -294,6 +294,13 @@ def load(env_name, seed=None):
         obs_dim = tf_env.observation_spec().shape[0] - 6
     else:
         obs_dim = tf_env.observation_spec().shape[0] // 2
+
+    # if env_name.startswith('antmaze'):
+    #     tf_env = tf_py_environment.TFPyEnvironment(
+    #         c_learning_utils.CanonicalActionSpaceWrapper(tf_env.envs[0]))
+    #     eval_tf_env = tf_py_environment.TFPyEnvironment(
+    #         c_learning_utils.CanonicalActionSpaceWrapper(eval_tf_env.envs[0]))
+
     try:
         start_index = gin.query_parameter('obs_to_goal.start_index')
         assert len(start_index) == 1
@@ -322,6 +329,7 @@ def load(env_name, seed=None):
         wrappers.ObservationFilterWrapper(tf_env.envs[0], indices))
     eval_tf_env = tf_py_environment.TFPyEnvironment(
         wrappers.ObservationFilterWrapper(eval_tf_env.envs[0], indices))
+
     return (tf_env, eval_tf_env, obs_dim)
 
 
@@ -756,124 +764,143 @@ class Maze2DLargeV1(Maze2DBase):
         )
 
 
-# class AntMazeBase(locomotion.ant.AntMazeEnv):
-#     def __init__(self, **kwargs):
-#         super(AntMazeBase, self).__init__(**kwargs)
-#
-#     def get_dataset(self, h5path=None):
-#         if h5path is None:
-#             if self._dataset_url is None:
-#                 raise ValueError("Offline env not configured with a dataset URL.")
-#             h5path = download_dataset_from_url(self.dataset_url)
-#
-#         data_dict = {}
-#         with h5py.File(h5path, 'r') as dataset_file:
-#             for k in tqdm(get_keys(dataset_file), desc="load datafile"):
-#                 try:  # first try loading as an array
-#                     data_dict[k] = dataset_file[k][:]
-#                 except ValueError as e:  # try loading as a scalar
-#                     data_dict[k] = dataset_file[k][()]
-#
-#         # Run a few quick sanity checks
-#         for key in ['observations', 'actions', 'rewards', 'terminals']:
-#             assert key in data_dict, 'Dataset is missing key %s' % key
-#         N_samples = data_dict['observations'].shape[0]
-#         # (chongyiz): concatenate goals to observations
-#         assert 'infos/goal' in data_dict
-#         data_dict['observations'] = np.concatenate([
-#             data_dict['observations'], data_dict['infos/goal'], np.zeros([N_samples, 27])], axis=-1)
-#         if self.observation_space.shape is not None:
-#             assert data_dict['observations'].shape[1:] == self.observation_space.shape, \
-#                 'Observation shape does not match env: %s vs %s' % (
-#                     str(data_dict['observations'].shape[1:]), str(self.observation_space.shape))
-#         assert data_dict['actions'].shape[1:] == self.action_space.shape, \
-#             'Action shape does not match env: %s vs %s' % (
-#                 str(data_dict['actions'].shape[1:]), str(self.action_space.shape))
-#         if data_dict['rewards'].shape == (N_samples, 1):
-#             data_dict['rewards'] = data_dict['rewards'][:, 0]
-#         assert data_dict['rewards'].shape == (N_samples,), 'Reward has wrong shape: %s' % (
-#             str(data_dict['rewards'].shape))
-#         if data_dict['terminals'].shape == (N_samples, 1):
-#             data_dict['terminals'] = data_dict['terminals'][:, 0]
-#         assert data_dict['terminals'].shape == (N_samples,), 'Terminals has wrong shape: %s' % (
-#             str(data_dict['rewards'].shape))
-#         return data_dict
-#
-#     def step(self, action):
-#         obs, reward, done, info = super(AntMazeBase, self).step(action)
-#         reward = 0.0
-#         done = False
-#         return obs, reward, done, info
-#
-#     def _get_obs(self):
-#         obs = super(AntMazeBase, self)._get_obs()
-#         return np.concatenate([obs, self.target_goal, np.zeros(27)], dtype=np.float32)
+class AntMazeBase(locomotion.ant.AntMazeEnv):
+    def __init__(self, **kwargs):
+        super(AntMazeBase, self).__init__(**kwargs)
+
+        # TODO (chongyiz): convert action_space of antmaze to [-1, 1]
+        self.orig_action_space = self.action_space
+        self.action_space = gym.spaces.Box(
+            low=-np.ones(self.orig_action_space.shape),
+            high=np.ones(self.orig_action_space.shape),
+            dtype=np.float32
+        )
+
+    def get_dataset(self, h5path=None):
+        if h5path is None:
+            if self._dataset_url is None:
+                raise ValueError("Offline env not configured with a dataset URL.")
+            h5path = download_dataset_from_url(self.dataset_url)
+
+        data_dict = {}
+        with h5py.File(h5path, 'r') as dataset_file:
+            for k in tqdm(get_keys(dataset_file), desc="load datafile"):
+                try:  # first try loading as an array
+                    data_dict[k] = dataset_file[k][:]
+                except ValueError as e:  # try loading as a scalar
+                    data_dict[k] = dataset_file[k][()]
+
+        # Run a few quick sanity checks
+        for key in ['observations', 'actions', 'rewards', 'terminals']:
+            assert key in data_dict, 'Dataset is missing key %s' % key
+        N_samples = data_dict['observations'].shape[0]
+        # (chongyiz): concatenate goals to observations
+        assert 'infos/goal' in data_dict
+        data_dict['observations'] = np.concatenate([
+            data_dict['observations'], data_dict['infos/goal'], np.zeros([N_samples, 27])], axis=-1)
+        if self.observation_space.shape is not None:
+            assert data_dict['observations'].shape[1:] == self.observation_space.shape, \
+                'Observation shape does not match env: %s vs %s' % (
+                    str(data_dict['observations'].shape[1:]), str(self.observation_space.shape))
+        assert data_dict['actions'].shape[1:] == self.action_space.shape, \
+            'Action shape does not match env: %s vs %s' % (
+                str(data_dict['actions'].shape[1:]), str(self.action_space.shape))
+        if data_dict['rewards'].shape == (N_samples, 1):
+            data_dict['rewards'] = data_dict['rewards'][:, 0]
+        assert data_dict['rewards'].shape == (N_samples,), 'Reward has wrong shape: %s' % (
+            str(data_dict['rewards'].shape))
+        if data_dict['terminals'].shape == (N_samples, 1):
+            data_dict['terminals'] = data_dict['terminals'][:, 0]
+        assert data_dict['terminals'].shape == (N_samples,), 'Terminals has wrong shape: %s' % (
+            str(data_dict['rewards'].shape))
+        return data_dict
+
+    def step(self, action):
+        if hasattr(self, 'orig_action_space'):
+            scale = self.orig_action_space.high - self.orig_action_space.low
+            offset = self.orig_action_space.low
+
+            # Map action to [0, 1].
+            action = 0.5 * (action + 1.0)
+
+            # Map action to [spec.minimum, spec.maximum].
+            action *= scale
+            action += offset
+
+        obs, reward, done, info = super(AntMazeBase, self).step(action)
+        reward = 0.0
+        done = False
+        return obs, reward, done, info
+
+    def _get_obs(self):
+        obs = super(AntMazeBase, self)._get_obs()
+        return np.concatenate([obs, self.target_goal, np.zeros(27)], dtype=np.float32)
 
 
-# class AntMazeUmazeDiverseV2(AntMazeBase):
-#     def __init__(self,
-#                  maze_map=locomotion.maze_env.U_MAZE_TEST,
-#                  reward_type='sparse',
-#                  dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5',
-#                  non_zero_reset=False,
-#                  eval=True,
-#                  maze_size_scaling=4.0,
-#                  ref_min_score=0.0,
-#                  ref_max_score=1.0,
-#                  v2_resets=True):
-#         super(AntMazeUmazeDiverseV2, self).__init__(
-#             maze_map=maze_map,
-#             reward_type=reward_type,
-#             dataset_url=dataset_url,
-#             non_zero_reset=non_zero_reset,
-#             eval=eval,
-#             maze_size_scaling=maze_size_scaling,
-#             ref_min_score=ref_min_score,
-#             ref_max_score=ref_max_score,
-#             v2_resets=v2_resets)
-#
-#
-# class AntMazeMediumDiverseV2(AntMazeBase):
-#     def __init__(self,
-#                  maze_map=locomotion.maze_env.BIG_MAZE_TEST,
-#                  reward_type='sparse',
-#                  dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_big-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5',
-#                  non_zero_reset=False,
-#                  eval=True,
-#                  maze_size_scaling=4.0,
-#                  ref_min_score=0.0,
-#                  ref_max_score=1.0,
-#                  v2_resets=True):
-#         super(AntMazeMediumDiverseV2, self).__init__(
-#             maze_map=maze_map,
-#             reward_type=reward_type,
-#             dataset_url=dataset_url,
-#             non_zero_reset=non_zero_reset,
-#             eval=eval,
-#             maze_size_scaling=maze_size_scaling,
-#             ref_min_score=ref_min_score,
-#             ref_max_score=ref_max_score,
-#             v2_resets=v2_resets)
-#
-#
-# class AntMazeLargeDiverseV2(AntMazeBase):
-#     def __init__(self,
-#                  maze_map=locomotion.maze_env.HARDEST_MAZE_TEST,
-#                  reward_type='sparse',
-#                  dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_hardest-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5',
-#                  non_zero_reset=False,
-#                  eval=True,
-#                  maze_size_scaling=4.0,
-#                  ref_min_score=0.0,
-#                  ref_max_score=1.0,
-#                  v2_resets=True):
-#         super(AntMazeLargeDiverseV2, self).__init__(
-#             maze_map=maze_map,
-#             reward_type=reward_type,
-#             dataset_url=dataset_url,
-#             non_zero_reset=non_zero_reset,
-#             eval=eval,
-#             maze_size_scaling=maze_size_scaling,
-#             ref_min_score=ref_min_score,
-#             ref_max_score=ref_max_score,
-#             v2_resets=v2_resets)
+class AntMazeUmazeDiverseV2(AntMazeBase):
+    def __init__(self,
+                 maze_map=locomotion.maze_env.U_MAZE_TEST,
+                 reward_type='sparse',
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5',
+                 non_zero_reset=False,
+                 eval=True,
+                 maze_size_scaling=4.0,
+                 ref_min_score=0.0,
+                 ref_max_score=1.0,
+                 v2_resets=True):
+        super(AntMazeUmazeDiverseV2, self).__init__(
+            maze_map=maze_map,
+            reward_type=reward_type,
+            dataset_url=dataset_url,
+            non_zero_reset=non_zero_reset,
+            eval=eval,
+            maze_size_scaling=maze_size_scaling,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            v2_resets=v2_resets)
+
+
+class AntMazeMediumDiverseV2(AntMazeBase):
+    def __init__(self,
+                 maze_map=locomotion.maze_env.BIG_MAZE_TEST,
+                 reward_type='sparse',
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_big-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5',
+                 non_zero_reset=False,
+                 eval=True,
+                 maze_size_scaling=4.0,
+                 ref_min_score=0.0,
+                 ref_max_score=1.0,
+                 v2_resets=True):
+        super(AntMazeMediumDiverseV2, self).__init__(
+            maze_map=maze_map,
+            reward_type=reward_type,
+            dataset_url=dataset_url,
+            non_zero_reset=non_zero_reset,
+            eval=eval,
+            maze_size_scaling=maze_size_scaling,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            v2_resets=v2_resets)
+
+
+class AntMazeLargeDiverseV2(AntMazeBase):
+    def __init__(self,
+                 maze_map=locomotion.maze_env.HARDEST_MAZE_TEST,
+                 reward_type='sparse',
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_hardest-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5',
+                 non_zero_reset=False,
+                 eval=True,
+                 maze_size_scaling=4.0,
+                 ref_min_score=0.0,
+                 ref_max_score=1.0,
+                 v2_resets=True):
+        super(AntMazeLargeDiverseV2, self).__init__(
+            maze_map=maze_map,
+            reward_type=reward_type,
+            dataset_url=dataset_url,
+            non_zero_reset=non_zero_reset,
+            eval=eval,
+            maze_size_scaling=maze_size_scaling,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            v2_resets=v2_resets)

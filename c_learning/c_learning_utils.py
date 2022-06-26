@@ -29,6 +29,8 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.utils import common
 from tf_agents.utils import nest_utils
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
+from tf_agents.environments import PyEnvironmentBaseWrapper
+from tf_agents.specs import BoundedArraySpec
 
 from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import SawyerXYZEnv
 
@@ -597,6 +599,86 @@ class AverageSuccessRate(BaseSuccessRateMetric):
     def _update_buffer(self):
         avg_success_rate = self._success_buffer.mean()
         self._buffer.add(avg_success_rate)
+
+
+# @gin.configurable
+# class CanonicalActionSpaceWrapper(PyEnvironmentBaseWrapper):
+#     def __init__(self, env, clip=False):
+#         super().__init__(env)
+#         self._action_spec = env.action_spec()
+#         self._clip = clip
+#
+#     def _step(self, action):
+#         # Get scale and offset of output action spec.
+#         if isinstance(self._action_spec, BoundedArraySpec):
+#             # Get scale and offset of output action spec.
+#             scale = self._action_spec.maximum - self._action_spec.minimum
+#             offset = self._action_spec.minimum
+#
+#             # Maybe clip the action.
+#             if self._clip:
+#                 action = np.clip(action, -1.0, 1.0)
+#
+#             # Map action to [0, 1].
+#             action = 0.5 * (action + 1.0)
+#
+#             # Map action to [spec.minimum, spec.maximum].
+#             action *= scale
+#             action += offset
+#
+#         return self._env.step(action)
+#
+#     def action_spec(self):
+#         if isinstance(self._action_spec, BoundedArraySpec):
+#             return self._action_spec.replace(
+#                 minimum=-np.ones(self._action_spec.shape),
+#                 maximum=np.ones(self._action_spec.shape))
+#         else:
+#             return self._action_spec
+
+
+# def _convert_spec(nested_spec: types.NestedSpec) -> types.NestedSpec:
+#     """Converts all bounded specs in nested spec to the canonical scale."""
+#
+#     def _convert_single_spec(spec: specs.Array) -> specs.Array:
+#         """Converts a single spec to canonical if bounded."""
+#         if isinstance(spec, specs.BoundedArray):
+#             return spec.replace(
+#                 minimum=-np.ones(spec.shape), maximum=np.ones(spec.shape))
+#         else:
+#             return spec
+#
+#     return tree.map_structure(_convert_single_spec, nested_spec)
+
+
+# def _scale_nested_action(
+#         nested_action,
+#         nested_spec,
+#         clip,
+# ):
+#     """Converts a canonical nested action back to the given nested action spec."""
+#
+#     def _scale_action(action: np.ndarray, spec):
+#         """Converts a single canonical action back to the given action spec."""
+#         if isinstance(spec, specs.BoundedArray):
+#             # Get scale and offset of output action spec.
+#             scale = spec.maximum - spec.minimum
+#             offset = spec.minimum
+#
+#             # Maybe clip the action.
+#             if clip:
+#                 action = np.clip(action, -1.0, 1.0)
+#
+#             # Map action to [0, 1].
+#             action = 0.5 * (action + 1.0)
+#
+#             # Map action to [spec.minimum, spec.maximum].
+#             action *= scale
+#             action += offset
+#
+#         return action
+#
+#     return tree.map_structure(_scale_action, nested_action, nested_spec)
 
 
 class MetaWorldWrapper(gym.Wrapper):

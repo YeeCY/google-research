@@ -17,6 +17,7 @@
 import d4rl
 from d4rl.offline_env import download_dataset_from_url, get_keys
 
+import gym
 import numpy as np
 import h5py
 from tqdm import tqdm
@@ -92,6 +93,14 @@ class AntMaze(d4rl.locomotion.ant.AntMazeEnv):
                                       dtype=np.float32,
                                       dataset_url=dataset_url)
 
+        # TODO (chongyiz): convert action_space of antmaze to [-1, 1]
+        self.orig_action_space = self.action_space
+        self.action_space = gym.spaces.Box(
+            low=-np.ones(self.orig_action_space.shape),
+            high=np.ones(self.orig_action_space.shape),
+            dtype=np.float32
+        )
+
     # def get_dataset(self, h5path=None):
     #     data_dict = super().get_dataset(h5path=h5path)
     #     assert 'infos/goal' in data_dict
@@ -155,6 +164,17 @@ class AntMaze(d4rl.locomotion.ant.AntMazeEnv):
         return self._get_obs()
 
     def step(self, action):
+        if hasattr(self, 'orig_action_space'):
+            scale = self.orig_action_space.high - self.orig_action_space.low
+            offset = self.orig_action_space.low
+
+            # Map action to [0, 1].
+            action = 0.5 * (action + 1.0)
+
+            # Map action to [spec.minimum, spec.maximum].
+            action *= scale
+            action += offset
+
         super(AntMaze, self).step(action)
         s = self._get_obs()
         dist = np.linalg.norm(self._goal_obs[:2] - s[:2])
