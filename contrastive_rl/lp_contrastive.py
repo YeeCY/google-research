@@ -96,7 +96,8 @@ def main(_):
   #   Metaworld: sawyer_image_{push,drawer,bin,window}
   #   OpenAI Gym Fetch: fetch_{reach,push}_image
   #   2D nav: point_image_{Small,Cross,FourRooms,U,Spiral11x11,Maze11x11}
-  env_name = 'fetch_reach'
+  # env_name = 'fetch_reach'
+  env_name = 'ant_umaze'
   params = {
       'seed': 0,
       'use_random_actor': True,
@@ -110,7 +111,8 @@ def main(_):
   # contrastive_nce, contrastive_cpc, c_learning, nce+c_learning, gcbc.
   # Many other algorithms can be implemented by passing other parameters
   # or adding a few lines of code.
-  alg = 'contrastive_nce'
+  # alg = 'contrastive_nce'
+  alg = 'c_learning'
   if alg == 'contrastive_nce':
     pass  # Just use the default hyperparameters
   elif alg == 'contrastive_cpc':
