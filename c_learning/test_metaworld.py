@@ -30,19 +30,53 @@ class SawyerDrawer(ALL_V2_ENVIRONMENTS['drawer-close-v2']):
         self.reset()
         self._freeze_rand_vec = False  # Set False to randomize the goal position.
 
-    def _get_pos_objects(self):
-        return self.get_body_com('drawer_link') + np.array([.0, -.16, 0.0])
+    # def _get_pos_objects(self):
+    #     return self.get_body_com('drawer_link') + np.array([.0, -.16, 0.0])
 
     def reset_model(self):
         super(SawyerDrawer, self).reset_model()
-        self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
+        # self._set_obj_xyz(np.random.uniform(-0.15, 0.0))  # open, close
+        self._set_obj_xyz(-0.1)  # open, close
+
         img = self.render(offscreen=True)
         img = Image.fromarray(img)
-        img.save("/data/chongyiz/offline_c_learning/debug")
+        img_path = "/data/chongyiz/offline_c_learning/debug/img0.png"
+        img.save(img_path)
+        print("Image saved to: {}".format(img_path))
 
         self._target_pos = self._get_pos_objects().copy()
 
+        self.data.site_xpos[self.model.site_name2id('goal')] = self._target_pos
+        img = self.render(offscreen=True)
+        img = Image.fromarray(img)
+        img_path = "/data/chongyiz/offline_c_learning/debug/img1.png"
+        img.save(img_path)
+        print("Image saved to: {}".format(img_path))
+
         self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
+
+        self.data.site_xpos[self.model.site_name2id('goal')] = self.get_endeff_pos()
+        img = self.render(offscreen=True)
+        img = Image.fromarray(img)
+        img_path = "/data/chongyiz/offline_c_learning/debug/img2.png"
+        img.save(img_path)
+        print("Image saved to: {}".format(img_path))
+
+        self.data.site_xpos[self.model.site_name2id('goal')] = self.tcp_center
+        img = self.render(offscreen=True)
+        img = Image.fromarray(img)
+        img_path = "/data/chongyiz/offline_c_learning/debug/img3.png"
+        img.save(img_path)
+        print("Image saved to: {}".format(img_path))
+
+        self.data.site_xpos[self.model.site_name2id('goal')] = self._target_pos
+        img = self.render(offscreen=True)
+        img = Image.fromarray(img)
+        img_path = "/data/chongyiz/offline_c_learning/debug/img4.png"
+        img.save(img_path)
+        print("Image saved to: {}".format(img_path))
+
+        exit()
         return self._get_obs()
 
     @property
