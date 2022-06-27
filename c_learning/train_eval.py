@@ -196,7 +196,7 @@ def train_eval(
                 batch_size=tf_env.batch_size,
                 obs_dim=obs_dim),
         ]
-        if env_name.startswith('metaworld'):
+        if env_name.startswith('metaworld') or env_name == 'sawyer_drawer_v2':
             eval_metrics.extend([
                 c_learning_utils.FinalSuccessRate(
                     buffer_size=num_eval_episodes, obs_dim=obs_dim),
@@ -247,7 +247,7 @@ def train_eval(
                         end_index=(end_index,),
                         name='SubsetDeltaDistance'),
                 ])
-                if env_name.startswith('metaworld'):
+                if env_name.startswith('metaworld') or env_name == 'sawyer_drawer_v2':
                     metrics.extend([
                         c_learning_utils.FinalSuccessRate(
                             buffer_size=num_eval_episodes,

@@ -34,6 +34,7 @@ from d4rl import locomotion
 import gym
 import mujoco_py
 from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from metaworld.envs.mujoco.env_dict import ALL_V2_ENVIRONMENTS
 from metaworld.envs.mujoco import sawyer_xyz
 
 from tf_agents.environments import suite_gym
@@ -59,7 +60,7 @@ def load_sawyer_reach():
     gym_env = SawyerReach()
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=50,
+        max_episode_steps=51,
     )
     return tf_py_environment.TFPyEnvironment(env)
 
@@ -99,6 +100,15 @@ def load_sawyer_drawer(random_init=False):
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=151,
+    )
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_sawyer_drawer_v2():
+    gym_env = SawyerDrawerV2()
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=501,
     )
     return tf_py_environment.TFPyEnvironment(env)
 
@@ -218,7 +228,7 @@ def load_metaworld(env_name, seed=None):
 
     env = suite_gym.wrap_env(
         gym_env,
-        max_episode_steps=gym_env.max_path_length,
+        max_episode_steps=gym_env.max_path_length + 1,
     )
 
     return tf_py_environment.TFPyEnvironment(env)
@@ -246,6 +256,9 @@ def load(env_name, seed=None):
     elif env_name == 'sawyer_drawer':
         tf_env = load_sawyer_drawer()
         eval_tf_env = load_sawyer_drawer()
+    elif env_name == 'sawyer_drawer_v2':
+        tf_env = load_sawyer_drawer_v2()
+        eval_tf_env = load_sawyer_drawer_v2()
     elif env_name == 'sawyer_window':
         tf_env = load_sawyer_window()
         eval_tf_env = load_sawyer_window()
@@ -578,6 +591,61 @@ def load(env_name, seed=None):
 #         return np.concatenate([obs, self._arm_goal, self.goal])
 #
 #
+class SawyerDrawerV2(ALL_V2_ENVIRONMENTS['drawer-close-v2']):
+    """Wrapper for the SawyerDrawer environment."""
+
+    def __init__(self):
+        super(SawyerDrawerV2, self).__init__()
+        # self._random_reset_space.low[0] = 0
+        # self._random_reset_space.high[0] = 0
+        self._partially_observable = False
+        self._freeze_rand_vec = False
+        self._set_task_called = True
+        self._target_pos = np.zeros(0)  # We will overwrite this later.
+        self.reset()
+        self._freeze_rand_vec = False  # Set False to randomize the goal position.
+
+    # def _get_pos_objects(self):
+    #     return self.get_body_com('drawer_link') + np.array([.0, -.16, 0.0])
+
+    def reset_model(self):
+        super(SawyerDrawerV2, self).reset_model()
+        self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
+        self._target_pos = self._get_pos_objects().copy()
+        self.data.site_xpos[self.model.site_name2id('goal')] = self._target_pos
+
+        self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
+        return self._get_obs()
+
+    @property
+    def observation_space(self):
+        return gym.spaces.Box(
+            low=np.full(8, -np.inf),
+            high=np.full(8, np.inf),
+            dtype=np.float32)
+
+    def _get_obs(self):
+        # finger_right, finger_left = (self._get_site_pos('rightEndEffector'),
+        #                              self._get_site_pos('leftEndEffector'))
+        # tcp_center = (finger_right + finger_left) / 2.0
+        # obj = self._get_pos_objects()
+        # # Arm position is same as drawer position. We only provide the drawer
+        # # Y coordinate.
+        # return np.concatenate([tcp_center, [obj[1]],
+        #                        self._target_pos, [self._target_pos[1]]])
+        pos_hand = self.get_endeff_pos()
+        obj = self._get_pos_objects()
+
+        return np.concatenate([pos_hand, [obj[1]],
+                               self._target_pos, [self._target_pos[1]]])
+
+    def step(self, action):
+        obs, _, done, info = super(SawyerDrawerV2, self).step(action)
+        reward = info['success']
+
+        return obs, reward, done, info
+
+
 # class SawyerFaucet(sawyer_xyz.SawyerFaucetOpenEnv):
 #     """Wrapper for the sawyer_faucet task."""
 #
