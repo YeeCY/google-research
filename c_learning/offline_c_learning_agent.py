@@ -779,7 +779,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                    actions,
                    weights=None,
                    ce_loss=False,
-                   bc_loss=False,
+                   mse_bc_loss=False,
+                   mle_bc_loss=False,
                    bc_lambda=0.25,
                    aw_loss=False,
                    aw_lambda=0.5):
@@ -801,6 +802,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
             sampled_actions, sampled_log_pi = self._actions_and_log_probs(time_steps)
+            log_pi, _ = self._log_probs(time_steps, actions)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
             # start_index = gin.query_parameter('obs_to_goal.start_index')
@@ -824,8 +826,11 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             else:
                 actor_loss = -1.0 * sampled_q_values / (1 - sampled_q_values)
 
-            if bc_loss:
+            if mse_bc_loss:
                 actor_loss += bc_lambda * tf.losses.mse(actions, sampled_actions)
+
+            if mle_bc_loss:
+                actor_loss -= bc_lambda * log_pi
 
             if aw_loss:
                 target_input = (time_steps.observation, actions)
@@ -834,7 +839,6 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 q_values2, _ = self._critic_network_2(
                     target_input, time_steps.step_type, training=False)
                 q_values = tf.minimum(q_values1, q_values2)
-                log_pi, _ = self._log_probs(time_steps, actions)
 
                 actor_loss = -tf.reduce_mean(
                     log_pi *
