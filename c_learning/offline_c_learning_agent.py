@@ -382,7 +382,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
             return common.Periodically(update, period, 'update_targets')
 
-    def _actions_and_log_probs(self, time_steps):
+    def _actions_log_probs_and_entropy(self, time_steps):
         """Get actions and corresponding log probabilities from policy."""
         # Get raw action distribution from policy, and initialize bijectors list.
         batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
@@ -394,8 +394,9 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
         log_pi = common.log_probability(action_distribution, actions,
                                         self.action_spec)
+        entropy = common.entropy(action_distribution.input_distribution, self.action_spec)
 
-        return actions, log_pi
+        return actions, log_pi, entropy
 
     def _log_probs(self, time_steps, actions):
         """Get log probabilities of actions from policy."""
@@ -432,6 +433,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             nest_utils.assert_same_structure(time_steps, self.time_step_spec)
             nest_utils.assert_same_structure(actions, self.action_spec)
 
+            # TODO (chongyiz): remove goal from the observations
             batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
             network_state = self._behavioral_cloning_network.get_initial_state(batch_size)
             bc_output, _ = self._behavioral_cloning_network(
@@ -627,7 +629,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             pred_td_pos_targets2, _ = self._critic_network_2(
                 pred_pos_input, time_steps.step_type, training=training)
 
-            neg_actions, _ = self._actions_and_log_probs(time_steps)
+            neg_actions, _, _ = self._actions_log_probs_and_entropy(time_steps)
             pred_neg_input = (observation, neg_actions)
             pred_td_neg_targets1, _ = self._critic_network_1(
                 pred_neg_input, time_steps.step_type, training=training)
@@ -801,7 +803,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         with tf.name_scope('actor_loss'):
             nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
-            sampled_actions, sampled_log_pi = self._actions_and_log_probs(time_steps)
+            sampled_actions, sampled_log_pi, sampled_entropy = \
+                self._actions_log_probs_and_entropy(time_steps)
             log_pi, _ = self._log_probs(time_steps, actions)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
@@ -857,6 +860,12 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             actor_loss = agg_loss.total_loss
             self._actor_loss_debug_summaries(actor_loss, actions, sampled_log_pi,
                                              sampled_q_values, time_steps)
+
+            # log entropy
+            tf.compat.v2.summary.scalar(
+                name='policy_entropy',
+                data=tf.reduce_mean(sampled_entropy),
+                step=self.train_step_counter)
 
             return actor_loss
 
