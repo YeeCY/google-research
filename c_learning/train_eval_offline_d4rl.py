@@ -48,6 +48,7 @@ from tf_agents import trajectories
 from tf_agents.trajectories import time_step as ts
 from tf_agents.trajectories import policy_step as ps
 from tf_agents.utils import nest_utils
+from tf_agents.specs import BoundedTensorSpec
 
 
 # limit gpu memory usage
@@ -152,8 +153,15 @@ def train_eval_offline(
             joint_fc_layer_params=critic_joint_fc_layers,
             kernel_initializer='glorot_uniform',
             last_kernel_initializer='glorot_uniform')
+
+        behavioral_cloning_observation_spec = BoundedTensorSpec(
+            shape=(obs_dim,),
+            dtype=observation_spec.dtype,
+            minimum=observation_spec.minimum,
+            maximum=observation_spec.maximum,
+        )
         behavioral_cloning_net = actor_distribution_network.ActorDistributionNetwork(
-            observation_spec,
+            behavioral_cloning_observation_spec,
             action_spec,
             fc_layer_params=actor_fc_layers,
             continuous_projection_net=proj_net)
@@ -196,6 +204,7 @@ def train_eval_offline(
                     learning_rate=critic_learning_rate),
                 behavioral_cloning_optimizer=tf.compat.v1.train.AdamOptimizer(
                     learning_rate=behavioral_cloning_learning_rate),
+                obs_dim=obs_dim,
                 target_update_tau=target_update_tau,
                 target_update_period=target_update_period,
                 td_errors_loss_fn=bce_loss,

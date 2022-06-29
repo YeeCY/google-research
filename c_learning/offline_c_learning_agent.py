@@ -44,7 +44,7 @@ from tf_agents.utils import eager_utils
 from tf_agents.utils import nest_utils
 from tf_agents.utils import object_identity
 
-from c_learning_utils import CLearningReward
+from c_learning_utils import CLearningGoalLabel
 
 
 EPSILON = 1e-7
@@ -65,6 +65,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                  actor_optimizer,
                  critic_optimizer,
                  behavioral_cloning_optimizer,
+                 obs_dim,
                  actor_loss_weight=1.0,
                  critic_loss_weight=0.5,
                  actor_policy_ctor=actor_policy.ActorPolicy,
@@ -186,6 +187,15 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
         self._actor_optimizer = actor_optimizer
         self._critic_optimizer = critic_optimizer
         self._behavioral_cloning_optimizer = behavioral_cloning_optimizer
+
+        goal_start_index = gin.query_parameter('obs_to_goal.start_index')[0]
+        goal_end_index = gin.query_parameter('obs_to_goal.end_index')[0]
+        self._obs_dim = obs_dim
+        if goal_end_index is not None:
+            self._goal_dim = goal_end_index - goal_start_index
+        else:
+            self._goal_dim = self._obs_dim
+
         self._actor_loss_weight = actor_loss_weight
         self._critic_loss_weight = critic_loss_weight
         self._td_errors_loss_fn = td_errors_loss_fn
@@ -385,10 +395,16 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
     def _actions_log_probs_and_entropy(self, time_steps):
         """Get actions and corresponding log probabilities from policy."""
         # Get raw action distribution from policy, and initialize bijectors list.
-        batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        # batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        batch_size = time_steps.observation.shape[0]
         policy_state = self._train_policy.get_initial_state(batch_size)
+        new_time_steps = ts.TimeStep(
+            step_type=time_steps.step_type,
+            reward=time_steps.reward,
+            discount=time_steps.discount,
+            observation=time_steps.observation[:, :self._obs_dim + self._goal_dim])
         action_distribution = self._train_policy.distribution(
-            time_steps, policy_state=policy_state).action
+            new_time_steps, policy_state=policy_state).action
 
         # Sample actions and log_pis from transformed distribution.
         actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
@@ -401,16 +417,22 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
     def _log_probs(self, time_steps, actions):
         """Get log probabilities of actions from policy."""
         # Get raw action distribution from policy, and initialize bijectors list.
-        batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        # batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        batch_size = time_steps.observation.shape[0]
         policy_state = self._train_policy.get_initial_state(batch_size)
+        new_time_steps = ts.TimeStep(
+            step_type=time_steps.step_type,
+            reward=time_steps.reward,
+            discount=time_steps.discount,
+            observation=time_steps.observation[:, :self._obs_dim + self._goal_dim])
         action_distribution = self._train_policy.distribution(
-            time_steps, policy_state=policy_state).action
+            new_time_steps, policy_state=policy_state).action
         
         cloning_network_state = self._behavioral_cloning_network.get_initial_state(
             batch_size)
         behavioral_cloning_action_distribution, _ = \
             self._behavioral_cloning_network(
-                time_steps.observation,
+                time_steps.observation[:, :self._obs_dim],
                 step_type=time_steps.step_type,
                 training=False,
                 network_state=cloning_network_state)
@@ -428,26 +450,31 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
     def behavioral_cloning_loss(self,
                                 time_steps,
                                 actions,
+                                mse_loss=True,
+                                mle_loss=False,
                                 weights=None):
         with tf.name_scope('behavioral_cloning'):
-            nest_utils.assert_same_structure(time_steps, self.time_step_spec)
-            nest_utils.assert_same_structure(actions, self.action_spec)
+            # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(actions, self.action_spec)
 
             # TODO (chongyiz): remove goal from the observations
-            batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+            # batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+            batch_size = time_steps.observation.shape[0]
             network_state = self._behavioral_cloning_network.get_initial_state(batch_size)
             bc_output, _ = self._behavioral_cloning_network(
-                time_steps.observation,
+                time_steps.observation[:, :self._obs_dim],
                 step_type=time_steps.step_type,
                 training=True,
                 network_state=network_state)
 
-            if isinstance(bc_output, tfp.distributions.Distribution):
+            if mse_loss:
                 bc_action = bc_output.sample()
-            else:
-                bc_action = bc_output
+                bc_loss = tf.nest.map_structure(tf.losses.mse, actions, bc_action)
 
-            bc_loss = tf.nest.map_structure(tf.losses.mse, actions, bc_action)
+            if mle_loss:
+                log_pi = common.log_probability(bc_output, actions,
+                                                self.action_spec)
+                bc_loss = -log_pi
 
             if bc_loss.shape.rank > 1:
                 # Sum over the time dimension.
@@ -513,13 +540,12 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
         # assert rfp + rnp == 0.5
         with tf.name_scope('critic_loss'):
-            nest_utils.assert_same_structure(actions, self.action_spec)
-            nest_utils.assert_same_structure(time_steps, self.time_step_spec)
-            nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(actions, self.action_spec)
+            # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
             # (chongyiz): we are actually using goal-conditioned policy here
             # Try not to use target network here
-            # TODO (chongyiz): check the classifier input
             # next_actions, next_log_pi = self._actions_and_log_probs(next_time_steps)
             next_log_pi, next_log_pi_beta = self._log_probs(next_time_steps, next_actions)
 
@@ -531,7 +557,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             # mask[..., -(end_index - start_index):] = 1
             # mask = tf.convert_to_tensor(mask)
 
-            target_input = (next_time_steps.observation, next_actions)
+            target_input = (
+                next_time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                next_actions
+            )
             target_q_values1, _ = self._target_critic_network_1(
                 target_input, next_time_steps.step_type, training=False)
             target_q_values2, _ = self._target_critic_network_2(
@@ -572,8 +601,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             if self_normalized:
                 w = w / tf.reduce_mean(w)
 
-            batch_size = nest_utils.get_outer_shape(time_steps,
-                                                    self._time_step_spec)[0]
+            # batch_size = nest_utils.get_outer_shape(time_steps,
+            #                                         self._time_step_spec)[0]
+            batch_size = time_steps.observation.shape[0]
+
             # half_batch = batch_size // 2
             float_batch_size = tf.cast(batch_size, float)
             num_next = tf.cast(tf.round(float_batch_size * rnp), tf.int32)
@@ -622,7 +653,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             #     td_targets = tf.concat([tf.ones(half_batch),
             #                             td_targets[half_batch:]], axis=0)
 
-            observation = time_steps.observation
+            observation = time_steps.observation[:, :self._obs_dim + self._goal_dim]
             pred_pos_input = (observation, actions)
             pred_td_pos_targets1, _ = self._critic_network_1(
                 pred_pos_input, time_steps.step_type, training=training)
@@ -649,10 +680,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             pred_td_neg_targets1 = tf.clip_by_value(pred_td_neg_targets1, EPSILON, 1. - EPSILON)
             pred_td_neg_targets2 = tf.clip_by_value(pred_td_neg_targets2, EPSILON, 1. - EPSILON)
 
+            goal_label = next_time_steps.reward[:, 1]
             if setting == 'b':
                 # [1, ..., 1, 0, ..., 0]
-                next_mask = tf.cast(
-                    next_time_steps.reward == CLearningReward.NEXT.value, tf.float32)
+                next_mask = tf.cast(goal_label == CLearningGoalLabel.NEXT.value, tf.float32)
                 # first_half_batch_mask = tf.concat([tf.ones(half_batch),
                 #                                    first_half_batch_mask[half_batch:]], axis=0)
                 # [0, ..., 0, 1, ..., 1, 0, ..., 0]
@@ -664,10 +695,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 #     tf.fill((batch_size - num_next - num_next_future,), 0.0))
                 # future_mask = (1 - next_time_steps.reward)[num_next:num_next + num_next_future].assign(
                 #     tf.fill((num_next_future,), 0.0))
-                next_future_mask = tf.cast(
-                    next_time_steps.reward == CLearningReward.NEXT_FUTURE.value, tf.float32)
-                future_mask = tf.cast(
-                    next_time_steps.reward == CLearningReward.FUTURE.value, tf.float32)
+                next_future_mask = tf.cast(goal_label == CLearningGoalLabel.NEXT_FUTURE.value, tf.float32)
+                future_mask = tf.cast(goal_label == CLearningGoalLabel.FUTURE.value, tf.float32)
 
                 critic_loss1 = -next_mask * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
                                next_future_mask * w * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
@@ -681,12 +710,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
             elif setting == 'c':
                 # [1, ..., 1, 0, ..., 0]
-                next_mask = tf.cast(
-                    next_time_steps.reward == CLearningReward.NEXT.value, tf.float32)
+                next_mask = tf.cast(goal_label == CLearningGoalLabel.NEXT.value, tf.float32)
 
                 # [0, ..., 0, 1, ..., 1]
-                random_mask = tf.cast(
-                    next_time_steps.reward == CLearningReward.RANDOM.value, tf.float32)
+                random_mask = tf.cast(goal_label == CLearningGoalLabel.RANDOM.value, tf.float32)
 
                 critic_loss1 = -next_mask * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
                                random_mask * w * gamma * tf.math.log(pred_td_pos_targets1 + EPSILON) - \
@@ -724,54 +751,6 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 data=tf.reduce_mean(
                     pred_td_pos_targets2 / (1 - pred_td_pos_targets2)),
                 step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='next C1 / (1 - C1)',
-            #     data=tf.reduce_mean(
-            #         pred_td_pos_targets1[:num_next] / (1 - pred_td_pos_targets1[:num_next])),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='next C2 / (1 - C2)',
-            #     data=tf.reduce_mean(
-            #         pred_td_pos_targets2[:num_next] / (1 - pred_td_pos_targets2[:num_next])),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='future C1 / (1 - C1)',
-            #     data=tf.reduce_mean(
-            #         pred_td_pos_targets1[num_next:num_next + num_future] /
-            #         (1 - pred_td_pos_targets1[num_next:num_next + num_future])),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='future C2 / (1 - C2)',
-            #     data=tf.reduce_mean(
-            #         pred_td_pos_targets2[num_next:num_next + num_future] /
-            #         (1 - pred_td_pos_targets2[num_next:num_next + num_future])),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='random C1 / (1 - C1)',
-            #     data=tf.reduce_mean(
-            #         pred_td_pos_targets1[half_batch:] / (1 - pred_td_pos_targets1[half_batch:])),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='random C2 / (1 - C2)',
-            #     data=tf.reduce_mean(
-            #         pred_td_pos_targets2[half_batch:] / (1 - pred_td_pos_targets2[half_batch:])),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='C1 / (1 - C1) is NAN',
-            #     data=tf.math.is_nan(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='C2 / (1 - C2) is NAN',
-            #     data=tf.math.is_nan(tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2))),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='C1 / (1 - C1) is inf',
-            #     data=tf.math.is_inf(tf.reduce_mean(pred_td_targets1 / (1 - pred_td_targets1))),
-            #     step=self.train_step_counter)
-            # tf.compat.v2.summary.scalar(
-            #     name='C2 / (1 - C2) is inf',
-            #     data=tf.math.is_inf(tf.reduce_mean(pred_td_targets2 / (1 - pred_td_targets2))),
-            #     step=self.train_step_counter)
 
             return critic_loss
 
@@ -801,7 +780,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
           actor_loss: A scalar actor loss.
         """
         with tf.name_scope('actor_loss'):
-            nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
             sampled_actions, sampled_log_pi, sampled_entropy = \
                 self._actions_log_probs_and_entropy(time_steps)
@@ -815,7 +794,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
             # mask[..., -(end_index - start_index):] = 1
             # mask = tf.convert_to_tensor(mask)
 
-            sampled_target_input = (time_steps.observation, sampled_actions)
+            sampled_target_input = (
+                time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                sampled_actions
+            )
             sampled_q_values1, _ = self._critic_network_1(
                 sampled_target_input, time_steps.step_type, training=False)
             sampled_q_values1, _ = self._critic_network_2(
@@ -836,7 +818,10 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 actor_loss -= bc_lambda * log_pi
 
             if aw_loss:
-                target_input = (time_steps.observation, actions)
+                target_input = (
+                    time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                    actions
+                )
                 q_values1, _ = self._critic_network_1(
                     target_input, time_steps.step_type, training=False)
                 q_values2, _ = self._critic_network_2(

@@ -35,7 +35,7 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import SawyerXYZEnv
 
 
-class CLearningReward(enum.Enum):
+class CLearningGoalLabel(enum.Enum):
     NEXT = 1
     NEXT_FUTURE = 2
     FUTURE = 3
@@ -312,38 +312,55 @@ def offline_goal_fn(experience,
 
     # (chongyiz): construct rewards
     if setting == 'b':
-        next_reward_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
-        next_reward = tf.cast(next_reward_mask, tf.float32) * CLearningReward.NEXT.value
+        next_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
+        next_label = tf.cast(next_mask, tf.float32) * CLearningGoalLabel.NEXT.value
 
         next_future_mask = np.zeros(batch_size, dtype=np.float32)
         next_future_mask[
             relabel_orig_num + relabel_next_num:relabel_orig_num + relabel_next_num + relabel_next_future_num] = 1.0
         next_future_mask = tf.convert_to_tensor(next_future_mask)
-        next_future_reward = next_future_mask * CLearningReward.NEXT_FUTURE.value
+        next_future_label = next_future_mask * CLearningGoalLabel.NEXT_FUTURE.value
 
-        future_reward_mask = tf.math.logical_and(
+        future_mask = tf.math.logical_and(
             tf.reduce_all(obs_to_goal(obs[:, 1]) != goals, axis=-1), ~tf.cast(next_future_mask, tf.bool))
-        future_reward = tf.cast(future_reward_mask, tf.float32) * CLearningReward.FUTURE.value
-        reward = next_reward + next_future_reward + future_reward
+        future_label = tf.cast(future_mask, tf.float32) * CLearningGoalLabel.FUTURE.value
+        goal_label = next_label + next_future_label + future_label
     elif setting == 'c':
-        next_reward_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
-        next_reward = tf.cast(next_reward_mask, tf.float32) * CLearningReward.NEXT.value
+        next_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) == goals, axis=-1)
+        next_label = tf.cast(next_mask, tf.float32) * CLearningGoalLabel.NEXT.value
 
-        random_reward_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) != goals, axis=-1)
-        random_reward = tf.cast(random_reward_mask, tf.float32) * CLearningReward.RANDOM.value
-        reward = next_reward + random_reward
+        random_mask = tf.reduce_all(obs_to_goal(obs[:, 1]) != goals, axis=-1)
+        random_label = tf.cast(random_mask, tf.float32) * CLearningGoalLabel.RANDOM.value
+        goal_label = next_label + random_label
     else:
         raise NotImplementedError
 
-    reward = tf.tile(reward[:, None], [1, 2])
+    goal_label = tf.tile(goal_label[:, None], [1, 2])
     new_obs = tf.concat([obs, tf.tile(goals[:, None, :], [1, 2, 1])], axis=2)
+
+    next_goals = obs_to_goal(experience.observation[:, 1, :obs_dim])
+    next_future_goals = obs_to_goal(get_future_goals(
+        experience.observation[:, 1:, :obs_dim],
+        experience.discount[:, 1:], gamma))
+    future_goals = obs_to_goal(get_future_goals(
+        experience.observation[:, :, :obs_dim],
+        experience.discount[:], gamma))
+    random_goals = obs_to_goal(
+        tf.random.shuffle(experience.observation[:, 0, :obs_dim]))
+    full_batch_new_goals = tf.concat(
+        [next_goals, next_future_goals, future_goals, random_goals],
+        axis=1)
+
+    new_obs = tf.concat([new_obs, tf.tile(full_batch_new_goals[:, None, :], [1, 2, 1])], axis=2)
+    new_reward = tf.stack([experience.reward[:, :2], goal_label], axis=2)
+
     experience = experience.replace(
-        observation=new_obs,  # [B x 2 x 2 * obs_dim]
+        observation=new_obs,
         action=experience.action[:, :2],
         step_type=experience.step_type[:, :2],
         next_step_type=experience.next_step_type[:, :2],
         discount=experience.discount[:, :2],
-        reward=reward,
+        reward=new_reward,
     )
     return experience, buffer_info
 
