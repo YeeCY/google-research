@@ -770,7 +770,7 @@ class AverageNormalizedScore(tf_metric.TFStepMetric):
 #     return tree.map_structure(_scale_action, nested_action, nested_spec)
 
 
-class MetaWorldWrapper(gym.Wrapper):
+class MetaWorldWrapper():
     def __init__(self, env):
         assert isinstance(env, SawyerXYZEnv), f"Invalid environment type: {type(env)}"
         super().__init__(env)
@@ -815,3 +815,38 @@ class MetaWorldWrapper(gym.Wrapper):
         #     obs = np.concatenate([obs, self.env._target_pos])
 
         return self._augment_obs(obs), reward, done, info
+
+
+class AntMazeWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        self.unwrapped_observation_space = self.observation_space
+        self.observation_space = gym.spaces.Box(
+            low=np.full(58, -np.inf),
+            high=np.full(58, np.inf),
+            dtype=np.float32
+        )
+
+    def _augment_goal(self, obs):
+        return np.concatenate([obs, self.target_goal, np.zeros(27)], dtype=np.float32)
+
+    def get_dataset(self, **kwargs):
+        dataset = self.env.get_dataset(**kwargs)
+
+        N_samples = dataset['observations'].shape[0]
+        dataset['observations'] = np.concatenate([
+            dataset['observations'], dataset['infos/goal'],
+            np.zeros([N_samples, 2])], axis=-1)
+
+        return dataset
+
+    def reset(self):
+        obs = self.env.reset()
+
+        return self._augment_goal(obs)
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+
+        return self._augment_goal(obs), reward, done, info
