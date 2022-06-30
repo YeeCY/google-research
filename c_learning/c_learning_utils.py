@@ -200,6 +200,21 @@ def goal_fn(experience,
     reward = tf.cast(reward, tf.float32)
     reward = tf.tile(reward[:, None], [1, 2])
     new_obs = tf.concat([obs, tf.tile(goals[:, None, :], [1, 2, 1])], axis=2)
+
+    next_goals = obs_to_goal(experience.observation[:, 1, :obs_dim])
+    next_future_goals = obs_to_goal(get_future_goals(
+        experience.observation[:, 1:, :obs_dim],
+        experience.discount[:, 1:], gamma))
+    future_goals = obs_to_goal(get_future_goals(
+        experience.observation[:, :, :obs_dim],
+        experience.discount[:], gamma))
+    random_goals = obs_to_goal(
+        tf.random.shuffle(experience.observation[:, 0, :obs_dim]))
+    full_batch_new_goals = tf.concat(
+        [next_goals, next_future_goals, future_goals, random_goals],
+        axis=1)
+    new_obs = tf.concat([new_obs, tf.tile(full_batch_new_goals[:, None, :], [1, 2, 1])], axis=2)
+
     experience = experience.replace(
         observation=new_obs,  # [B x 2 x 2 * obs_dim]
         action=experience.action[:, :2],

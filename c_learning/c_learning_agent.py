@@ -60,6 +60,7 @@ class CLearningAgent(tf_agent.TFAgent):
                  actor_network,
                  actor_optimizer,
                  critic_optimizer,
+                 obs_dim,
                  actor_loss_weight=1.0,
                  critic_loss_weight=0.5,
                  actor_policy_ctor=actor_policy.ActorPolicy,
@@ -346,20 +347,73 @@ class CLearningAgent(tf_agent.TFAgent):
 
             return common.Periodically(update, period, 'update_targets')
 
-    def _actions_and_log_probs(self, time_steps):
+    def _actions_log_probs_and_entropy(self, time_steps, future_goal=False):
         """Get actions and corresponding log probabilities from policy."""
         # Get raw action distribution from policy, and initialize bijectors list.
-        batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        # batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        batch_size = time_steps.observation.shape[0]
         policy_state = self._train_policy.get_initial_state(batch_size)
+        if future_goal:
+            # TODO (chongyiz): check this.
+            new_time_steps = ts.TimeStep(
+                step_type=time_steps.step_type,
+                reward=time_steps.reward,
+                discount=time_steps.discount,
+                observation=tf.concat([
+                    time_steps.observation[:, :self._obs_dim],
+                    time_steps.observation[
+                        :, self._obs_dim + 3 * self._goal_dim:self._obs_dim + 4 * self._goal_dim]
+                ], axis=-1)
+            )
+        else:
+            new_time_steps = ts.TimeStep(
+                step_type=time_steps.step_type,
+                reward=time_steps.reward,
+                discount=time_steps.discount,
+                observation=time_steps.observation[:, :self._obs_dim + self._goal_dim])
         action_distribution = self._train_policy.distribution(
-            time_steps, policy_state=policy_state).action
+            new_time_steps, policy_state=policy_state).action
 
         # Sample actions and log_pis from transformed distribution.
         actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
         log_pi = common.log_probability(action_distribution, actions,
                                         self.action_spec)
+        entropy = common.entropy(action_distribution.input_distribution, self.action_spec)
 
-        return actions, log_pi
+        return actions, log_pi, entropy
+
+    def _log_probs(self, time_steps, actions, future_goal=False):
+        """Get log probabilities of actions from policy."""
+        # Get raw action distribution from policy, and initialize bijectors list.
+        # batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+        batch_size = time_steps.observation.shape[0]
+        policy_state = self._train_policy.get_initial_state(batch_size)
+        if future_goal:
+            new_time_steps = ts.TimeStep(
+                step_type=time_steps.step_type,
+                reward=time_steps.reward,
+                discount=time_steps.discount,
+                observation=tf.concat([
+                    time_steps.observation[:, :self._obs_dim],
+                    time_steps.observation[
+                    :, self._obs_dim + 3 * self._goal_dim:self._obs_dim + 4 * self._goal_dim]
+                ], axis=-1)
+            )
+        else:
+            new_time_steps = ts.TimeStep(
+                step_type=time_steps.step_type,
+                reward=time_steps.reward,
+                discount=time_steps.discount,
+                observation=time_steps.observation[:, :self._obs_dim + self._goal_dim])
+        action_distribution = self._train_policy.distribution(
+            new_time_steps, policy_state=policy_state).action
+
+        # Get log_pis from transformed distribution.
+        # actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
+        log_pi = common.log_probability(action_distribution, actions,
+                                        self.action_spec)
+
+        return log_pi
 
     @gin.configurable
     def critic_loss(self,
@@ -403,9 +457,9 @@ class CLearningAgent(tf_agent.TFAgent):
         rnp = gin.query_parameter('goal_fn.relabel_next_prob')
         assert rfp + rnp == 0.5
         with tf.name_scope('critic_loss'):
-            nest_utils.assert_same_structure(actions, self.action_spec)
-            nest_utils.assert_same_structure(time_steps, self.time_step_spec)
-            nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(actions, self.action_spec)
+            # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
             next_actions, _ = self._actions_and_log_probs(next_time_steps)
             target_input = (next_time_steps.observation, next_actions)
@@ -581,7 +635,12 @@ class CLearningAgent(tf_agent.TFAgent):
                    time_steps,
                    actions,
                    weights=None,
-                   ce_loss=False):
+                   ce_loss=False,
+                   mse_bc_loss=False,
+                   mle_bc_loss=False,
+                   bc_lambda=0.25,
+                   aw_loss=False,
+                   aw_lambda=0.5):
         """Computes the actor_loss for C-learning training.
 
         Args:
@@ -597,20 +656,49 @@ class CLearningAgent(tf_agent.TFAgent):
           actor_loss: A scalar actor loss.
         """
         with tf.name_scope('actor_loss'):
-            nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
-            sampled_actions, log_pi = self._actions_and_log_probs(time_steps)
-            target_input = (time_steps.observation, sampled_actions)
-            q_values1, _ = self._critic_network_1(
-                target_input, time_steps.step_type, training=False)
-            q_values2, _ = self._critic_network_2(
-                target_input, time_steps.step_type, training=False)
-            q_values = tf.minimum(q_values1, q_values2)
+            # try future goal for both setting b and c
+            sampled_actions, sampled_log_pi, sampled_entropy = \
+                self._actions_log_probs_and_entropy(time_steps, future_goal=True)
+            log_pi = self._log_probs(time_steps, actions, future_goal=True)
+
+            sampled_target_input = (
+                time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                sampled_actions
+            )
+            sampled_q_values1, _ = self._critic_network_1(
+                sampled_target_input, time_steps.step_type, training=False)
+            sampled_q_values2, _ = self._critic_network_2(
+                sampled_target_input, time_steps.step_type, training=False)
+            sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
             if ce_loss:
                 actor_loss = tf.keras.losses.binary_crossentropy(
-                    tf.ones_like(q_values), q_values)
+                    tf.ones_like(sampled_q_values), sampled_q_values)
             else:
-                actor_loss = -1.0 * q_values
+                actor_loss = -1.0 * sampled_q_values
+
+            if mse_bc_loss:
+                actor_loss += bc_lambda * tf.losses.mse(actions, sampled_actions)
+
+            if mle_bc_loss:
+                actor_loss -= bc_lambda * log_pi
+
+            if aw_loss:
+                target_input = (
+                    time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                    actions
+                )
+                q_values1, _ = self._critic_network_1(
+                    target_input, time_steps.step_type, training=False)
+                q_values2, _ = self._critic_network_2(
+                    target_input, time_steps.step_type, training=False)
+                q_values = tf.minimum(q_values1, q_values2)
+
+                actor_loss = -tf.reduce_mean(
+                    log_pi *
+                    tf.math.exp((tf.math.log(q_values) - tf.math.log(1 - q_values)) / aw_lambda)
+                )
 
             if actor_loss.shape.rank > 1:
                 # Sum over the time dimension.
@@ -622,8 +710,14 @@ class CLearningAgent(tf_agent.TFAgent):
                 sample_weight=weights,
                 regularization_loss=reg_loss)
             actor_loss = agg_loss.total_loss
-            self._actor_loss_debug_summaries(actor_loss, actions, log_pi,
-                                             q_values, time_steps)
+            self._actor_loss_debug_summaries(actor_loss, actions, sampled_log_pi,
+                                             sampled_q_values, time_steps)
+
+            # log entropy
+            tf.compat.v2.summary.scalar(
+                name='policy_entropy',
+                data=tf.reduce_mean(sampled_entropy),
+                step=self.train_step_counter)
 
             return actor_loss
 
