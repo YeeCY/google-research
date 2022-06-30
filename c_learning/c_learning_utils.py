@@ -441,7 +441,7 @@ class BaseDistanceMetric(tf_metric.TFStepMetric):
         super(BaseDistanceMetric, self).__init__(name=name, prefix=prefix)
         self._buffer = tf_metrics.TFDeque(buffer_size, dtype)
         self._dist_buffer = tf_metrics.TFDeque(
-            1000, dtype)  # Episodes should have length less than 1k
+            2000, dtype)  # Episodes should have length less than 2k
         self.dtype = dtype
 
     @common.function(autograph=True)
@@ -568,7 +568,7 @@ class BaseSuccessRateMetric(tf_metric.TFStepMetric):
         super(BaseSuccessRateMetric, self).__init__(name=name, prefix=prefix)
         self._buffer = tf_metrics.TFDeque(buffer_size, dtype)
         self._success_buffer = tf_metrics.TFDeque(
-            1000, dtype)  # Episodes should have length less than 1k
+            2000, dtype)  # Episodes should have length less than 2k
         self.dtype = dtype
 
     @common.function(autograph=True)
@@ -617,6 +617,63 @@ class AverageSuccessRate(BaseSuccessRateMetric):
         avg_success_rate = self._success_buffer.mean()
         self._buffer.add(avg_success_rate)
 
+
+class AverageNormalizedScore(tf_metric.TFStepMetric):
+    """Computes the average normalized score."""
+    NAME = 'AverageNormalizedScore'
+
+    def __init__(self,
+                 prefix='Metrics',
+                 dtype=tf.float32,
+                 buffer_size=10,
+                 # obs_dim=None,
+                 # start_index=(0,),
+                 # end_index=(None,),
+                 ref_max_score=None,
+                 ref_min_score=None,
+                 name=None):
+        # assert obs_dim is not None
+        assert ref_max_score is not None
+        assert ref_min_score is not None
+        self._ref_max_score = ref_max_score
+        self._ref_min_score = ref_min_score
+        # self._start_index = start_index
+        # self._end_index = end_index
+        # self._obs_dim = obs_dim
+        name = self.NAME if name is None else name
+        super(AverageNormalizedScore, self).__init__(name=name, prefix=prefix)
+        self._buffer = tf_metrics.TFDeque(buffer_size, dtype)
+        self._reward_buffer = tf_metrics.TFDeque(
+            2000, dtype)  # Episodes should have length less than 2k
+        self.dtype = dtype
+
+    @common.function(autograph=True)
+    def call(self, trajectory):
+        reward = trajectory.reward
+        if len(tf.shape(reward)) == 2:
+            reward = reward[0]
+        else:
+            assert len(tf.shape(reward)) == 1
+
+        self._reward_buffer.extend(reward)
+        if trajectory.is_last()[0] and self._reward_buffer.length > 0:
+            self._update_buffer()
+            self._reward_buffer.clear()
+        return trajectory
+
+    def result(self):
+        return self._buffer.mean()
+
+    @common.function
+    def reset(self):
+        self._reward_buffer.clear()
+
+    @common.function
+    def _update_buffer(self):
+        ret = tf.reduce_sum(self._reward_buffer.data)
+        score = 100 * (ret - self._ref_min_score) / \
+                (self._ref_max_score - self._ref_min_score)
+        self._buffer.add(score)
 
 # @gin.configurable
 # class CanonicalActionSpaceWrapper(PyEnvironmentBaseWrapper):

@@ -735,7 +735,6 @@ class Maze2DBase(pointmaze.MazeEnv):
 
     def step(self, action):
         obs, reward, done, info = super(Maze2DBase, self).step(action)
-        reward = 0.0
         done = False
         return obs, reward, done, info
 

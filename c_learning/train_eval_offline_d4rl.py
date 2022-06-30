@@ -221,6 +221,10 @@ def train_eval_offline(
             eval_dir, flush_millis=summaries_flush_secs * 1000)
         eval_metrics = [
             tf_metrics.AverageEpisodeLengthMetric(buffer_size=num_eval_episodes),
+            c_learning_utils.AverageNormalizedScore(
+                buffer_size=num_eval_episodes,
+                ref_max_score=tf_env.pyenv.envs[0].ref_max_score,
+                ref_min_score=tf_env.pyenv.envs[0].ref_min_score),
             c_learning_utils.FinalDistance(
                 buffer_size=num_eval_episodes, obs_dim=obs_dim),
             c_learning_utils.MinimumDistance(
@@ -251,39 +255,39 @@ def train_eval_offline(
                 obs_dim=obs_dim),
         ]
 
-        if log_subset is not None:
-            start_index, end_index = log_subset
-            for name, metrics in [('train', train_metrics), ('eval', eval_metrics)]:
-                metrics.extend([
-                    c_learning_utils.InitialDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetInitialDistance'),
-                    c_learning_utils.FinalDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetFinalDistance'),
-                    c_learning_utils.MinimumDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetMinimumDistance'),
-                    c_learning_utils.DeltaDistance(
-                        buffer_size=num_eval_episodes,
-                        batch_size=tf_env.batch_size if name == 'train' else 10,
-                        obs_dim=obs_dim,
-                        start_index=start_index,
-                        end_index=end_index,
-                        name='SubsetDeltaDistance'),
-                ])
+        # if log_subset is not None:
+        #     start_index, end_index = log_subset
+        #     for name, metrics in [('train', train_metrics), ('eval', eval_metrics)]:
+        #         metrics.extend([
+        #             c_learning_utils.InitialDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetInitialDistance'),
+        #             c_learning_utils.FinalDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetFinalDistance'),
+        #             c_learning_utils.MinimumDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetMinimumDistance'),
+        #             c_learning_utils.DeltaDistance(
+        #                 buffer_size=num_eval_episodes,
+        #                 batch_size=tf_env.batch_size if name == 'train' else 10,
+        #                 obs_dim=obs_dim,
+        #                 start_index=start_index,
+        #                 end_index=end_index,
+        #                 name='SubsetDeltaDistance'),
+        #         ])
 
         eval_policy = greedy_policy.GreedyPolicy(tf_agent.policy)
         # initial_collect_policy = random_tf_policy.RandomTFPolicy(
