@@ -177,7 +177,15 @@ class CLearningAgent(tf_agent.TFAgent):
         self._target_update_period = target_update_period
         self._actor_optimizer = actor_optimizer
         self._critic_optimizer = critic_optimizer
+
+        goal_start_index = gin.query_parameter('obs_to_goal.start_index')[0]
+        goal_end_index = gin.query_parameter('obs_to_goal.end_index')[0]
         self._obs_dim = obs_dim
+        if goal_end_index is not None:
+            self._goal_dim = goal_end_index - goal_start_index
+        else:
+            self._goal_dim = self._obs_dim
+
         self._actor_loss_weight = actor_loss_weight
         self._critic_loss_weight = critic_loss_weight
         self._td_errors_loss_fn = td_errors_loss_fn
@@ -462,8 +470,11 @@ class CLearningAgent(tf_agent.TFAgent):
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
             # nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
-            next_actions, _ = self._actions_and_log_probs(next_time_steps)
-            target_input = (next_time_steps.observation, next_actions)
+            next_actions, _, _ = self._actions_log_probs_and_entropy(next_time_steps)
+            target_input = (
+                next_time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                next_actions
+            )
             target_q_values1, _ = self._target_critic_network_1(
                 target_input, next_time_steps.step_type, training=False)
             target_q_values2, _ = self._target_critic_network_2(
@@ -486,8 +497,7 @@ class CLearningAgent(tf_agent.TFAgent):
             if self_normalized:
                 w = w / tf.reduce_mean(w)
 
-            batch_size = nest_utils.get_outer_shape(time_steps,
-                                                    self._time_step_spec)[0]
+            batch_size = time_steps.observation.shape[0]
             half_batch = batch_size // 2
             float_batch_size = tf.cast(batch_size, float)
             num_next = tf.cast(tf.round(float_batch_size * rnp), tf.int32)
@@ -521,7 +531,7 @@ class CLearningAgent(tf_agent.TFAgent):
                 td_targets = tf.concat([tf.ones(half_batch),
                                         td_targets[half_batch:]], axis=0)
 
-            observation = time_steps.observation
+            observation = time_steps.observation[:, :self._obs_dim + self._goal_dim]
             pred_input = (observation, actions)
             pred_td_targets1, _ = self._critic_network_1(
                 pred_input, time_steps.step_type, training=training)
@@ -754,8 +764,7 @@ class CLearningAgent(tf_agent.TFAgent):
                 step=self.train_step_counter)
             common.generate_tensor_summaries('target_q_values', target_q_values,
                                              self.train_step_counter)
-            batch_size = nest_utils.get_outer_shape(time_steps,
-                                                    self._time_step_spec)[0]
+            batch_size = time_steps.observation.shape[0]
             policy_state = self._train_policy.get_initial_state(batch_size)
             action_distribution = self._train_policy.distribution(
                 time_steps, policy_state).action
