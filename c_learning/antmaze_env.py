@@ -89,6 +89,8 @@ class AntMaze(d4rl.locomotion.ant.AntMazeEnv):
                                       non_zero_reset=non_zero_reset,
                                       eval=True,
                                       maze_size_scaling=4.0,
+                                      ref_max_score=1.0,
+                                      ref_min_score=0.0,
                                       high=np.full((58,), np.inf),
                                       dtype=np.float32,
                                       dataset_url=dataset_url)
