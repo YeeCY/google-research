@@ -173,10 +173,11 @@ def load_maze2d_large_v1():
 
 
 def load_antmaze_umaze_v2():
-    gym_env = antmaze_env.AntMaze(
-        'umaze',
-        non_zero_reset=True,
-        dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5')
+    gym_env = AntMazeUmazeV2()
+    # gym_env = antmaze_env.AntMaze(
+    #     'umaze',
+    #     non_zero_reset=True,
+    #     dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5')
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=701,
@@ -895,13 +896,34 @@ class AntMazeBase(locomotion.ant.AntMazeEnv):
             action += offset
 
         obs, reward, done, info = super(AntMazeBase, self).step(action)
-        reward = 0.0
-        done = False
         return obs, reward, done, info
 
     def _get_obs(self):
         obs = super(AntMazeBase, self)._get_obs()
         return np.concatenate([obs, self.target_goal, np.zeros(27)], dtype=np.float32)
+
+
+class AntMazeUmazeV2(AntMazeBase):
+    def __init__(self,
+                 maze_map=locomotion.maze_env.U_MAZE_TEST,
+                 reward_type='sparse',
+                 dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5',
+                 non_zero_reset=False,
+                 eval=True,
+                 maze_size_scaling=4.0,
+                 ref_min_score=0.0,
+                 ref_max_score=1.0,
+                 v2_resets=True):
+        super(AntMazeUmazeV2, self).__init__(
+            maze_map=maze_map,
+            reward_type=reward_type,
+            dataset_url=dataset_url,
+            non_zero_reset=non_zero_reset,
+            eval=eval,
+            maze_size_scaling=maze_size_scaling,
+            ref_min_score=ref_min_score,
+            ref_max_score=ref_max_score,
+            v2_resets=v2_resets)
 
 
 class AntMazeUmazeDiverseV2(AntMazeBase):

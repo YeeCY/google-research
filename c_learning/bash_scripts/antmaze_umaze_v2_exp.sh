@@ -19,7 +19,7 @@ for seed in "${seeds[@]}"; do
   python $PROJECT_DIR/train_eval.py \
     --gin_bindings="train_eval.env_name='antmaze-umaze-v2'" \
     --gin_bindings="train_eval.random_seed=${seed}" \
-    --gin_bindings="train_eval.num_iterations=3000000" \
+    --gin_bindings="train_eval.num_iterations=1000000" \
     --gin_bindings="train_eval.max_future_steps=250" \
     --gin_bindings="obs_to_goal.start_index=(0,)" \
     --gin_bindings="obs_to_goal.end_index=(2,)" \
