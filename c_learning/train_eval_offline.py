@@ -168,6 +168,7 @@ def train_eval_offline(
                     learning_rate=actor_learning_rate),
                 critic_optimizer=tf.compat.v1.train.AdamOptimizer(
                     learning_rate=critic_learning_rate),
+                obs_dim=obs_dim,
                 target_update_tau=target_update_tau,
                 target_update_period=target_update_period,
                 td_errors_loss_fn=bce_loss,
@@ -189,6 +190,7 @@ def train_eval_offline(
                     learning_rate=critic_learning_rate),
                 behavioral_cloning_optimizer=tf.compat.v1.train.AdamOptimizer(
                     learning_rate=behavioral_cloning_learning_rate),
+                obs_dim=obs_dim,
                 target_update_tau=target_update_tau,
                 target_update_period=target_update_period,
                 td_errors_loss_fn=bce_loss,

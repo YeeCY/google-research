@@ -177,6 +177,7 @@ class CLearningAgent(tf_agent.TFAgent):
         self._target_update_period = target_update_period
         self._actor_optimizer = actor_optimizer
         self._critic_optimizer = critic_optimizer
+        self._obs_dim = obs_dim
         self._actor_loss_weight = actor_loss_weight
         self._critic_loss_weight = critic_loss_weight
         self._td_errors_loss_fn = td_errors_loss_fn
