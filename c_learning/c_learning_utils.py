@@ -565,24 +565,26 @@ class TFUniformReplayBuffer(tf_uniform_replay_buffer.TFUniformReplayBuffer):
             return tf.group(write_id_op, write_data_op)
 
 
-class BaseSuccessRateMetric(tf_metric.TFStepMetric):
+class SuccessRate(tf_metric.TFStepMetric):
+    NAME = 'SuccessRate'
+
     def __init__(self,
                  prefix='Metrics',
                  dtype=tf.float32,
-                 batch_size=1,
+                 # batch_size=1,
                  buffer_size=10,
-                 obs_dim=None,
-                 start_index=(0,),
-                 end_index=(None,),
+                 # obs_dim=None,
+                 # start_index=(0,),
+                 # end_index=(None,),
                  name=None):
-        assert obs_dim is not None
-        self._start_index = start_index
-        self._end_index = end_index
-        self._obs_dim = obs_dim
+        # assert obs_dim is not None
+        # self._start_index = start_index
+        # self._end_index = end_index
+        # self._obs_dim = obs_dim
         name = self.NAME if name is None else name
-        super(BaseSuccessRateMetric, self).__init__(name=name, prefix=prefix)
+        super(SuccessRate, self).__init__(name=name, prefix=prefix)
         self._buffer = tf_metrics.TFDeque(buffer_size, dtype)
-        self._success_buffer = tf_metrics.TFDeque(
+        self._reward_buffer = tf_metrics.TFDeque(
             2000, dtype)  # Episodes should have length less than 2k
         self.dtype = dtype
 
@@ -595,13 +597,13 @@ class BaseSuccessRateMetric(tf_metric.TFStepMetric):
         #     obs_to_goal(obs_to_goal(s), self._start_index, self._end_index) -
         #     obs_to_goal(g, self._start_index, self._end_index),
         #     axis=1)
-        success = trajectory.reward
-        tf.assert_equal(tf.shape(success)[0], 1)
+        reward = trajectory.reward
+        tf.assert_equal(tf.shape(reward)[0], 1)
         if trajectory.is_mid():
-            self._success_buffer.extend(success)
-        if trajectory.is_last()[0] and self._success_buffer.length > 0:
+            self._reward_buffer.extend(reward)
+        if trajectory.is_last()[0] and self._reward_buffer.length > 0:
             self._update_buffer()
-            self._success_buffer.clear()
+            self._reward_buffer.clear()
         return trajectory
 
     def result(self):
@@ -612,25 +614,29 @@ class BaseSuccessRateMetric(tf_metric.TFStepMetric):
         self._buffer.clear()
 
     def _update_buffer(self):
-        raise NotImplementedError
+        # raise NotImplementedError
+        success = tf.cast(
+            tf.reduce_sum(self._reward_buffer.data) >= 1, float)
+        print("success: {}".format(success))
+        self._buffer.add(success * 100)
 
 
-class FinalSuccessRate(BaseSuccessRateMetric):
-    """Computes the final success rate."""
-    NAME = 'FinalSuccessRate'
-
-    def _update_buffer(self):
-        final_success_rate = self._success_buffer.data[-1]
-        self._buffer.add(final_success_rate)
-
-
-class AverageSuccessRate(BaseSuccessRateMetric):
-    """Computes the average success rate."""
-    NAME = 'AverageSuccessRate'
-
-    def _update_buffer(self):
-        avg_success_rate = self._success_buffer.mean()
-        self._buffer.add(avg_success_rate)
+# class FinalSuccessRate(BaseSuccessRateMetric):
+#     """Computes the final success rate."""
+#     NAME = 'FinalSuccessRate'
+#
+#     def _update_buffer(self):
+#         final_success_rate = self._success_buffer.data[-1]
+#         self._buffer.add(final_success_rate)
+#
+#
+# class AverageSuccessRate(BaseSuccessRateMetric):
+#     """Computes the average success rate."""
+#     NAME = 'AverageSuccessRate'
+#
+#     def _update_buffer(self):
+#         avg_success_rate = self._success_buffer.mean()
+#         self._buffer.add(avg_success_rate)
 
 
 class AverageNormalizedScore(tf_metric.TFStepMetric):

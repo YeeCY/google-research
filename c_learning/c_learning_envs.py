@@ -271,9 +271,9 @@ def load(env_name, seed=None):
     elif env_name == 'sawyer_faucet':
         tf_env = load_sawyer_faucet()
         eval_tf_env = load_sawyer_faucet()
-    elif env_name == 'maze2d-open-v0':
-        tf_env = load_maze2d_open_v0()
-        eval_tf_env = load_maze2d_open_v0()
+    # elif env_name == 'maze2d-open-v0':
+    #     tf_env = load_maze2d_open_v0()
+    #     eval_tf_env = load_maze2d_open_v0()
     elif env_name == 'maze2d-umaze-v1':
         tf_env = load_maze2d_umaze_v1()
         eval_tf_env = load_maze2d_umaze_v1()
@@ -771,7 +771,7 @@ class Maze2DOpenV0(Maze2DBase):
         )
 
 
-class Maze2DUmazeV1(Maze2DBase):
+class Maze2DUMazeV1(Maze2DBase):
     """Wrapper for the D4RL maze2d-umaze-v1 task."""
 
     def __init__(self,
@@ -782,7 +782,7 @@ class Maze2DUmazeV1(Maze2DBase):
                  ref_max_score=161.86,
                  dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-umaze-sparse-v1.hdf5',
                  **kwargs):
-        super(Maze2DUmazeV1, self).__init__(
+        super(Maze2DUMazeV1, self).__init__(
             maze_spec=maze_spec,
             reward_type=reward_type,
             reset_target=reset_target,

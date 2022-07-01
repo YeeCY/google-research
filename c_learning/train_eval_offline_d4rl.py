@@ -226,6 +226,8 @@ def train_eval_offline(
                 buffer_size=num_eval_episodes,
                 ref_max_score=tf_env.pyenv.envs[0].ref_max_score,
                 ref_min_score=tf_env.pyenv.envs[0].ref_min_score),
+            c_learning_utils.SuccessRate(
+                buffer_size=num_eval_episodes),
             c_learning_utils.FinalDistance(
                 buffer_size=num_eval_episodes, obs_dim=obs_dim),
             c_learning_utils.MinimumDistance(
