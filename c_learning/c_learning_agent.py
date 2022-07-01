@@ -696,6 +696,7 @@ class CLearningAgent(tf_agent.TFAgent):
                 actor_loss -= bc_lambda * log_pi
 
             if aw_loss:
+                # TODO (chongyiz): use only future goals instead of relabeled goals
                 target_input = (
                     time_steps.observation[:, :self._obs_dim + self._goal_dim],
                     actions

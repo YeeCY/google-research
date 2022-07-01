@@ -809,7 +809,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
 
             # try future goal for both setting b and c
             sampled_actions, sampled_log_pi, sampled_entropy = \
-                self._actions_log_probs_and_entropy(time_steps, future_goal=True)
+                self._actions_log_probs_and_entropy(time_steps)
             log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
 
             # TODO (chongyiz): trying to zero out observations other than states for classifer
@@ -844,6 +844,7 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
                 actor_loss -= bc_lambda * log_pi
 
             if aw_loss:
+                # TODO (chongyiz): use only future goals instead of relabeled goals
                 target_input = (
                     time_steps.observation[:, :self._obs_dim + self._goal_dim],
                     actions
