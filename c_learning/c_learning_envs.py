@@ -186,7 +186,10 @@ def load_antmaze_umaze_v2():
     #     gym_env,
     #     max_episode_steps=701,
     # )
-    env = suite_gym.wrap_env(gym_env)  # max_episode_steps = 700
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=701,
+    )
 
     return tf_py_environment.TFPyEnvironment(env)
 

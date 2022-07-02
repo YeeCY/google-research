@@ -216,7 +216,7 @@ def goal_fn(experience,
     new_obs = tf.concat([new_obs, tf.tile(full_batch_new_goals[:, None, :], [1, 2, 1])], axis=2)
 
     experience = experience.replace(
-        observation=new_obs,  # [B x 2 x 2 * obs_dim]
+        observation=new_obs,
         action=experience.action[:, :2],
         step_type=experience.step_type[:, :2],
         next_step_type=experience.next_step_type[:, :2],
@@ -853,6 +853,7 @@ class AntMazeWrapper(gym.Wrapper):
         return self._augment_goal(obs)
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, _, info = self.env.step(action)
+        done = False
 
         return self._augment_goal(obs), reward, done, info

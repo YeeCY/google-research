@@ -153,6 +153,7 @@ def train_eval(
                 learning_rate=actor_learning_rate),
             critic_optimizer=tf.compat.v1.train.AdamOptimizer(
                 learning_rate=critic_learning_rate),
+            obs_dim=obs_dim,
             target_update_tau=target_update_tau,
             target_update_period=target_update_period,
             td_errors_loss_fn=bce_loss,
@@ -167,6 +168,12 @@ def train_eval(
             eval_dir, flush_millis=summaries_flush_secs * 1000)
         eval_metrics = [
             tf_metrics.AverageEpisodeLengthMetric(buffer_size=num_eval_episodes),
+            c_learning_utils.AverageNormalizedScore(
+                buffer_size=num_eval_episodes,
+                ref_max_score=tf_env.pyenv.envs[0].ref_max_score,
+                ref_min_score=tf_env.pyenv.envs[0].ref_min_score),
+            c_learning_utils.SuccessRate(
+                buffer_size=num_eval_episodes),
             c_learning_utils.FinalDistance(
                 buffer_size=num_eval_episodes, obs_dim=obs_dim),
             c_learning_utils.MinimumDistance(
@@ -313,8 +320,8 @@ def train_eval(
             initial_collect_driver.run = common.function(initial_collect_driver.run)
             collect_driver.run = common.function(collect_driver.run)
             tf_agent.train = common.function(tf_agent.train)
-            # c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
-            c_learning_utils.obs_to_goal = common.function(c_learning_utils.obs_to_goal)
+            c_learning_utils.goal_fn = common.function(c_learning_utils.goal_fn)
+            # c_learning_utils.obs_to_goal = common.function(c_learning_utils.obs_to_goal)
 
         # Save the hyperparameters
         operative_filename = os.path.join(root_dir, 'operative.gin')
