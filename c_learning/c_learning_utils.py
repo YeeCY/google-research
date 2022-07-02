@@ -829,8 +829,8 @@ class AntMazeWrapper(gym.Wrapper):
 
         self.unwrapped_observation_space = self.observation_space
         self.observation_space = gym.spaces.Box(
-            low=np.full(58, -np.inf),
-            high=np.full(58, np.inf),
+            low=-np.ones(58),
+            high=np.ones(58),
             dtype=np.float32
         )
 
@@ -843,7 +843,7 @@ class AntMazeWrapper(gym.Wrapper):
         N_samples = dataset['observations'].shape[0]
         dataset['observations'] = np.concatenate([
             dataset['observations'], dataset['infos/goal'],
-            np.zeros([N_samples, 2])], axis=-1)
+            np.zeros([N_samples, 27])], axis=-1)
 
         return dataset
 
