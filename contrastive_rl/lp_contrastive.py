@@ -97,7 +97,8 @@ def main(_):
     #   OpenAI Gym Fetch: fetch_{reach,push}_image
     #   2D nav: point_image_{Small,Cross,FourRooms,U,Spiral11x11,Maze11x11}
     # env_name = 'fetch_reach'
-    env_name = 'ant_umaze'
+    # env_name = 'ant_umaze'
+    env_name = 'offline_ant_umaze'
     params = {
         'seed': 0,
         'use_random_actor': True,
