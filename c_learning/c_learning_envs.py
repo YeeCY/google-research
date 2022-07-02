@@ -144,7 +144,7 @@ def load_maze2d_open_v0():
 
 
 def load_maze2d_umaze_v1():
-    gym_env = Maze2DUmazeV1()
+    gym_env = Maze2DUMazeV1()
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=301,
