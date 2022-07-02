@@ -175,12 +175,12 @@ def load_maze2d_large_v1():
 
 def load_antmaze_umaze_v2():
     # gym_env = AntMazeUmazeV2()
-    # gym_env = antmaze_env.AntMaze(
-    #     'umaze',
-    #     non_zero_reset=True,
-    #     dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5')
-    gym_env = gym.make("antmaze-umaze-v2")
-    gym_env = c_learning_utils.AntMazeWrapper(gym_env)
+    gym_env = antmaze_env.AntMaze(
+        'umaze',
+        non_zero_reset=True,
+        dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5')
+    # gym_env = gym.make("antmaze-umaze-v2")
+    # gym_env = c_learning_utils.AntMazeWrapper(gym_env)
 
     # env = suite_gym.wrap_env(
     #     gym_env,
