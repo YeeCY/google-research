@@ -33,11 +33,11 @@ from contrastive import utils as contrastive_utils
 import launchpad as lp
 
 FLAGS = flags.FLAGS
-flags.DEFINE_bool('debug', False, 'Runs training for just a few steps.')
+flags.DEFINE_boolean('debug', False, 'Runs training for just a few steps.')
 flags.DEFINE_string('root_dir', '~/contrastive_rl_logs',
                     'Root directory for writing logs/summaries/checkpoints.')
-flags.DEFINE_bool('root_dir_add_uid', False,
-                  'If True adds a UID to the log path.')
+flags.DEFINE_boolean('root_dir_add_uid', False,
+                     'If True adds a UID to the log path.')
 flags.DEFINE_string('env_name', 'sawyer_window',
                     'Select an environment')
 flags.DEFINE_string('alg', 'contrastive_nce',
