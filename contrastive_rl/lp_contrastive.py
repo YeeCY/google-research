@@ -42,6 +42,7 @@ flags.DEFINE_string('env_name', 'sawyer_window',
                     'Select an environment')
 flags.DEFINE_string('alo', 'contrastive_nce',
                     'Select an algorithm to run the experiment')
+flags.DEFINE_integer('seed', 0, 'Random seed')
 
 
 @functools.lru_cache()
@@ -119,7 +120,7 @@ def main(_):
     # env_name = 'ant_umaze'
     env_name = FLAGS.env_name
     params = {
-        'seed': 0,
+        'seed': FLAGS.seed,
         'use_random_actor': True,
         'entropy_coefficient': None if 'image' in env_name else 0.0,
         'env_name': env_name,
