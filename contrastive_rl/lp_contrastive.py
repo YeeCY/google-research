@@ -40,7 +40,7 @@ flags.DEFINE_bool('root_dir_add_uid', False,
                   'If True adds a UID to the log path.')
 flags.DEFINE_string('env_name', 'sawyer_window',
                     'Select an environment')
-flags.DEFINE_string('alo', 'contrastive_nce',
+flags.DEFINE_string('alg', 'contrastive_nce',
                     'Select an algorithm to run the experiment')
 flags.DEFINE_integer('seed', 0, 'Random seed')
 
