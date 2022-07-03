@@ -202,7 +202,7 @@ class DistributedLayout:
                 discount = 1.0
                 if t == 0 or dataset['timeouts'][t - 1]:
                     step_type = dm_env.StepType.FIRST
-                    traj_id = np.random.randint(100)
+                    # traj_id = np.random.randint(100)  # DELETEME (chongyiz): not used
                 elif dataset['timeouts'][t]:
                     step_type = dm_env.StepType.LAST
                     discount = 0.0
