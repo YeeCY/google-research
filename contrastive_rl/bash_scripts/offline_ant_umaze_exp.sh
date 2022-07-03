@@ -24,5 +24,5 @@ for seed in "${seeds[@]}"; do
     --alg=c_learning \
     --seed="$seed" \
     --log_dir=~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed \
-  > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed/stream.log 2>&1 &
+  > ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed/stream.log 2>&1 &
 done
