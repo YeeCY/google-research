@@ -20,10 +20,10 @@ for seed in "${seeds[@]}"; do
   mkdir -p ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed
   nohup \
   python $PROJECT_DIR/lp_contrastive.py \
-    --env_name=offline_ant_umaze \
-    --alg=c_learning \
-    --seed="$seed" \
-    --lp_launch_type=local_mt \
-    --log_dir=~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed \
+    --env_name offline_ant_umaze \
+    --alg c_learning \
+    --seed "$seed" \
+    --lp_launch_type local_mt \
+    --root_dir ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed \
   > ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed/stream.log 2>&1 &
 done

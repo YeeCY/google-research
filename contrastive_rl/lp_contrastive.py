@@ -34,9 +34,9 @@ import launchpad as lp
 
 FLAGS = flags.FLAGS
 flags.DEFINE_bool('debug', True, 'Runs training for just a few steps.')
-flags.DEFINE_string('log_dir', '~/contrastive_rl_logs',
+flags.DEFINE_string('root_dir', '~/contrastive_rl_logs',
                     'Root directory for writing logs/summaries/checkpoints.')
-flags.DEFINE_bool('log_dir_add_uid', False,
+flags.DEFINE_bool('root_dir_add_uid', False,
                   'If True adds a UID to the log path.')
 flags.DEFINE_string('env_name', 'sawyer_window',
                     'Select an environment')
