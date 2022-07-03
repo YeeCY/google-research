@@ -33,14 +33,14 @@ class ContrastiveNetworks:
     policy_network: networks_lib.FeedForwardNetwork
     q_network: networks_lib.FeedForwardNetwork
     log_prob: networks_lib.LogProbFn
-    repr_fn: Callable[Ellipsis, networks_lib.NetworkOutput]
+    repr_fn: Callable[..., networks_lib.NetworkOutput]
     sample: networks_lib.SampleFn
     sample_eval: Optional[networks_lib.SampleFn] = None
 
 
 def apply_policy_and_sample(
-        networks,
-        eval_mode=False):
+        networks: ContrastiveNetworks,
+        eval_mode: bool = False) -> actor_core_lib.FeedForwardPolicy:
     """Returns a function that computes actions."""
     sample_fn = networks.sample if not eval_mode else networks.sample_eval
     if not sample_fn:
@@ -53,15 +53,15 @@ def apply_policy_and_sample(
 
 
 def make_networks(
-        spec,
-        obs_dim,
-        repr_dim=64,
-        repr_norm=False,
-        repr_norm_temp=True,
-        hidden_layer_sizes=(256, 256),
-        actor_min_std=1e-6,
-        twin_q=False,
-        use_image_obs=False):
+        spec: specs.EnvironmentSpec,
+        obs_dim: int,
+        repr_dim: int = 64,
+        repr_norm: bool = False,
+        repr_norm_temp: bool = True,
+        hidden_layer_sizes: Tuple[int, ...] = (256, 256),
+        actor_min_std: float = 1e-6,
+        twin_q: bool = False,
+        use_image_obs: bool = False) -> ContrastiveNetworks:
     """Creates networks used by the agent."""
 
     num_dimensions = np.prod(spec.actions.shape, dtype=int)

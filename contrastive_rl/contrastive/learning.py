@@ -50,15 +50,15 @@ class ContrastiveLearner(acme.Learner):
 
     def __init__(
             self,
-            networks,
-            rng,
-            policy_optimizer,
-            q_optimizer,
-            iterator,
-            counter,
-            logger,
-            obs_to_goal,
-            config):
+            networks: contrastive_networks.ContrastiveNetworks,
+            rng: jnp.ndarray,
+            policy_optimizer: optax.GradientTransformation,
+            q_optimizer: optax.GradientTransformation,
+            iterator: Iterator[reverb.ReplaySample],
+            counter: counting.Counter,
+            logger: loggers.Logger,
+            obs_to_goal: Callable[jnp.ndarray, jnp.ndarray],
+            config: contrastive_config.ContrastiveConfig):
         """Initialize the Contrastive RL learner.
 
         Args:
@@ -89,10 +89,10 @@ class ContrastiveLearner(acme.Learner):
                 raise ValueError('target_entropy should not be set when '
                                  'entropy_coefficient is provided')
 
-        def alpha_loss(log_alpha,
-                       policy_params,
-                       transitions,
-                       key):
+        def alpha_loss(log_alpha: jnp.ndarray,
+                       policy_params: networks_lib.Params,
+                       transitions: types.Transition,
+                       key: networks_lib.PRNGKey) -> jnp.ndarray:
             """Eq 18 from https://arxiv.org/pdf/1812.05905.pdf."""
             dist_params = networks.policy_network.apply(
                 policy_params, transitions.observation)
@@ -103,11 +103,11 @@ class ContrastiveLearner(acme.Learner):
                 -log_prob - config.target_entropy)
             return jnp.mean(alpha_loss)
 
-        def critic_loss(q_params,
-                        policy_params,
-                        target_q_params,
-                        transitions,
-                        key):
+        def critic_loss(q_params: networks_lib.Params,
+                        policy_params: networks_lib.Params,
+                        target_q_params: networks_lib.Params,
+                        transitions: types.Transition,
+                        key: networks_lib.PRNGKey) -> jnp.ndarray:
             batch_size = transitions.observation.shape[0]
             # Note: We might be able to speed up the computation for some of the
             # baselines to making a single network that returns all the values. This
@@ -217,12 +217,12 @@ class ContrastiveLearner(acme.Learner):
 
             return loss, metrics
 
-        def actor_loss(policy_params,
-                       q_params,
-                       alpha,
-                       transitions,
-                       key,
-                       ):
+        def actor_loss(policy_params: networks_lib.Params,
+                       q_params: networks_lib.Params,
+                       alpha: jnp.ndarray,
+                       transitions: types.Transition,
+                       key: networks_lib.PRNGKey,
+                       ) -> jnp.ndarray:
             obs = transitions.observation
             if config.use_gcbc:
                 dist_params = networks.policy_network.apply(
@@ -263,9 +263,9 @@ class ContrastiveLearner(acme.Learner):
         actor_grad = jax.value_and_grad(actor_loss)
 
         def update_step(
-                state,
-                transitions,
-        ):
+                state: TrainingState,
+                transitions: types.Transition,
+        ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
 
             key, key_alpha, key_critic, key_actor = jax.random.split(state.key, 4)
             if adaptive_entropy_coefficient:
@@ -352,7 +352,7 @@ class ContrastiveLearner(acme.Learner):
         else:
             self._update_step = update_step
 
-        def make_initial_state(key):
+        def make_initial_state(key: networks_lib.PRNGKey) -> TrainingState:
             """Initialises the training state (parameters and optimiser state)."""
             key_policy, key_q, key = jax.random.split(key, 3)
 
@@ -405,15 +405,15 @@ class ContrastiveLearner(acme.Learner):
         # Attempts to write the logs.
         self._logger.write({**metrics, **counts})
 
-    def get_variables(self, names):
+    def get_variables(self, names: List[str]) -> List[Any]:
         variables = {
             'policy': self._state.policy_params,
             'critic': self._state.q_params,
         }
         return [variables[name] for name in names]
 
-    def save(self):
+    def save(self) -> TrainingState:
         return self._state
 
-    def restore(self, state):
+    def restore(self, state: TrainingState):
         self._state = state

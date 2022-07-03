@@ -42,7 +42,7 @@ def get_env(env_name, start_index, end_index):
                                               seed=0)
 
 
-def get_program(params):
+def get_program(params: Dict[str, Any]) -> lp.Program:
     """Constructs the program."""
 
     env_name = params['env_name']
@@ -53,6 +53,10 @@ def get_program(params):
         params['num_sgd_steps_per_step'] = 16
         params['prefetch_size'] = 16
         params['num_actors'] = 10
+
+    if env_name.startswith('offline_ant'):
+        # No actors needed for the offline RL experiments. Evaluation is handled separately.
+        params['num_actors'] = 0
 
     config = contrastive.ContrastiveConfig(**params)
 
@@ -66,6 +70,8 @@ def get_program(params):
     assert (environment.action_spec().maximum == 1).all()
     config.obs_dim = obs_dim
     config.max_episode_steps = getattr(environment, '_step_limit') + 1
+    if env_name == 'offline_ant_umaze_diverse':
+        config.max_episode_steps = 1000  # This environment terminates after 700 steps, but the demos have length 1000 steps.
     network_factory = functools.partial(
         contrastive.make_networks, obs_dim=obs_dim, repr_dim=config.repr_dim,
         repr_norm=config.repr_norm, twin_q=config.twin_q,
@@ -96,8 +102,11 @@ def main(_):
     #   Metaworld: sawyer_image_{push,drawer,bin,window}
     #   OpenAI Gym Fetch: fetch_{reach,push}_image
     #   2D nav: point_image_{Small,Cross,FourRooms,U,Spiral11x11,Maze11x11}
-    # env_name = 'fetch_reach'
-    # env_name = 'ant_umaze'
+    # Offline environments:
+    #   antmaze: offline_ant_{umaze,umaze_diverse,
+    #                             medium_play,medium_diverse,
+    #                             large_play,large_diverse}
+    # env_name = 'sawyer_window'
     env_name = 'offline_ant_umaze'
     params = {
         'seed': 0,
@@ -106,6 +115,7 @@ def main(_):
         'env_name': env_name,
         'max_number_of_steps': 1_000_000,
         'use_image_obs': 'image' in env_name,
+        'end_index': 2,  # Just for the antmaze environments,
     }
 
     # 2. Select an algorithm. The currently-supported algorithms are:
@@ -134,7 +144,7 @@ def main(_):
     # use this mainly for debugging.
     if FLAGS.debug:
         params.update({
-            'min_replay_size': 2_000,
+            'min_replay_size': 10_000,
             'local': True,
             'num_sgd_steps_per_step': 1,
             'prefetch_size': 1,

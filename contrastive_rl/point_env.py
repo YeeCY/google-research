@@ -97,7 +97,7 @@ class PointEnv(gym.Env):
     """Abstract class for 2D navigation environments."""
 
     def __init__(self,
-                 walls=None, resize_factor=1):
+                 walls: Optional[str] = None, resize_factor: int = 1):
         """Initialize the point environment.
 
         Args:

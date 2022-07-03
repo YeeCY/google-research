@@ -162,7 +162,7 @@ class FetchReachImage(reach.FetchReachEnv):
 
     def _viewer_setup(self):
         super(FetchReachImage, self)._viewer_setup()
-        self.viewer.cam.lookat[Ellipsis] = np.array([1.2, 0.8, 0.5])
+        self.viewer.cam.lookat[...] = np.array([1.2, 0.8, 0.5])
         self.viewer.cam.distance = 0.8
         self.viewer.cam.azimuth = 180
         self.viewer.cam.elevation = -30
@@ -267,12 +267,12 @@ class FetchPushImage(push.FetchPushEnv):
     def _viewer_setup(self):
         super(FetchPushImage, self)._viewer_setup()
         if self._camera_name == 'camera1':
-            self.viewer.cam.lookat[Ellipsis] = np.array([1.2, 0.8, 0.4])
+            self.viewer.cam.lookat[...] = np.array([1.2, 0.8, 0.4])
             self.viewer.cam.distance = 0.9
             self.viewer.cam.azimuth = 180
             self.viewer.cam.elevation = -40
         elif self._camera_name == 'camera2':
-            self.viewer.cam.lookat[Ellipsis] = np.array([1.25, 0.8, 0.4])
+            self.viewer.cam.lookat[...] = np.array([1.25, 0.8, 0.4])
             self.viewer.cam.distance = 0.65
             self.viewer.cam.azimuth = 90
             self.viewer.cam.elevation = -40

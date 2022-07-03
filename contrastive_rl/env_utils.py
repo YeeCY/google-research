@@ -35,23 +35,22 @@ def euler2quat(euler):
     euler = np.asarray(euler, dtype=np.float64)
     assert euler.shape[-1] == 3, 'Invalid shape euler {}'.format(euler)
 
-    ai, aj, ak = euler[Ellipsis, 2] / 2, -euler[Ellipsis, 1] / 2, euler[Ellipsis, 0] / 2
+    ai, aj, ak = euler[..., 2] / 2, -euler[..., 1] / 2, euler[..., 0] / 2
     si, sj, sk = np.sin(ai), np.sin(aj), np.sin(ak)
     ci, cj, ck = np.cos(ai), np.cos(aj), np.cos(ak)
     cc, cs = ci * ck, ci * sk
     sc, ss = si * ck, si * sk
 
     quat = np.empty(euler.shape[:-1] + (4,), dtype=np.float64)
-    quat[Ellipsis, 0] = cj * cc + sj * ss
-    quat[Ellipsis, 3] = cj * sc - sj * cs
-    quat[Ellipsis, 2] = -(cj * ss + sj * cc)
-    quat[Ellipsis, 1] = cj * cs - sj * sc
+    quat[..., 0] = cj * cc + sj * ss
+    quat[..., 3] = cj * sc - sj * cs
+    quat[..., 2] = -(cj * ss + sj * cc)
+    quat[..., 1] = cj * cs - sj * sc
     return quat
 
 
 def load(env_name):
     """Loads the train and eval environments, as well as the obs_dim."""
-    # pylint: disable=invalid-name
     kwargs = {}
     if env_name == 'sawyer_push':
         CLASS = SawyerPush

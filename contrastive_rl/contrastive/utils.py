@@ -54,21 +54,21 @@ class SuccessObserver(observers_base.EnvLoopObserver):
         self._rewards = []
         self._success = []
 
-    def observe_first(self, env, timestep
-                      ):
+    def observe_first(self, env: dm_env.Environment, timestep: dm_env.TimeStep
+                      ) -> None:
         """Observes the initial state."""
         if self._rewards:
             success = np.sum(self._rewards) >= 1
             self._success.append(success)
         self._rewards = []
 
-    def observe(self, env, timestep,
-                action):
+    def observe(self, env: dm_env.Environment, timestep: dm_env.TimeStep,
+                action: np.ndarray) -> None:
         """Records one environment step."""
         assert timestep.reward in [0, 1]
         self._rewards.append(timestep.reward)
 
-    def get_metrics(self):
+    def get_metrics(self) -> Dict[str, observers_base.Number]:
         """Returns metrics collected for the current episode."""
         return {
             'success': float(np.sum(self._rewards) >= 1),
@@ -79,8 +79,8 @@ class SuccessObserver(observers_base.EnvLoopObserver):
 class DistanceObserver(observers_base.EnvLoopObserver):
     """Observer that measures the L2 distance to the goal."""
 
-    def __init__(self, obs_dim, start_index, end_index,
-                 smooth=True):
+    def __init__(self, obs_dim: int, start_index: int, end_index: int,
+                 smooth: bool = True):
         self._distances = []
         self._obs_dim = obs_dim
         self._obs_to_goal = functools.partial(
@@ -88,8 +88,8 @@ class DistanceObserver(observers_base.EnvLoopObserver):
         self._smooth = smooth
         self._history = {}
 
-    def _get_distance(self, env,
-                      timestep):
+    def _get_distance(self, env: dm_env.Environment,
+                      timestep: dm_env.TimeStep) -> float:
         if hasattr(env, '_dist'):
             assert env._dist  # pylint: disable=protected-access
             return env._dist[-1]  # pylint: disable=protected-access
@@ -101,20 +101,20 @@ class DistanceObserver(observers_base.EnvLoopObserver):
             dist = np.linalg.norm(self._obs_to_goal(obs) - goal)
             return dist
 
-    def observe_first(self, env, timestep
-                      ):
+    def observe_first(self, env: dm_env.Environment, timestep: dm_env.TimeStep
+                      ) -> None:
         """Observes the initial state."""
         if self._smooth and self._distances:
             for key, value in self._get_current_metrics().items():
                 self._history[key] = self._history.get(key, []) + [value]
         self._distances = [self._get_distance(env, timestep)]
 
-    def observe(self, env, timestep,
-                action):
+    def observe(self, env: dm_env.Environment, timestep: dm_env.TimeStep,
+                action: np.ndarray) -> None:
         """Records one environment step."""
         self._distances.append(self._get_distance(env, timestep))
 
-    def _get_current_metrics(self):
+    def _get_current_metrics(self) -> Dict[str, observers_base.Number]:
         metrics = {
             'init_dist': self._distances[0],
             'final_dist': self._distances[-1],
@@ -123,7 +123,7 @@ class DistanceObserver(observers_base.EnvLoopObserver):
         }
         return metrics
 
-    def get_metrics(self):
+    def get_metrics(self) -> Dict[str, observers_base.Number]:
         """Returns metrics collected for the current episode."""
         metrics = self._get_current_metrics()
         if self._smooth:
@@ -136,8 +136,8 @@ class DistanceObserver(observers_base.EnvLoopObserver):
 class ObservationFilterWrapper(base.EnvironmentWrapper):
     """Wrapper that exposes just the desired goal coordinates."""
 
-    def __init__(self, environment,
-                 idx):
+    def __init__(self, environment: dm_env.Environment,
+                 idx: Optional[Sequence[int]]):
         """Initializes a new ObservationFilterWrapper.
 
         Args:
@@ -159,22 +159,22 @@ class ObservationFilterWrapper(base.EnvironmentWrapper):
     def _convert_observation(self, observation):
         return observation[self._idx]
 
-    def step(self, action):
+    def step(self, action) -> dm_env.TimeStep:
         timestep = self._environment.step(action)
         return timestep._replace(
             observation=self._convert_observation(timestep.observation))
 
-    def reset(self):
+    def reset(self) -> dm_env.TimeStep:
         timestep = self._environment.reset()
         return timestep._replace(
             observation=self._convert_observation(timestep.observation))
 
-    def observation_spec(self):
+    def observation_spec(self) -> types.NestedSpec:
         return self._observation_spec
 
 
-def make_environment(env_name, start_index, end_index,
-                     seed):
+def make_environment(env_name: str, start_index: int, end_index: int,
+                     seed: int):
     """Creates the environment.
 
     Args:
@@ -209,7 +209,7 @@ class InitiallyRandomActor(actors.GenericActor):
     """
 
     def select_action(self,
-                      observation):
+                      observation: network_lib.Observation) -> types.NestedArray:
         if (self._params['mlp/~/linear_0']['b'] == 0).all():
             shape = self._params['Normal/~/linear']['b'].shape
             rng, self._state = jax.random.split(self._state)

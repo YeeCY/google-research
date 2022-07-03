@@ -43,7 +43,7 @@ class ContrastiveConfig:
     target_entropy: float = 0.0
     # Target smoothing coefficient.
     tau: float = 0.005
-    hidden_layer_sizes: Tuple[int, Ellipsis] = (256, 256)
+    hidden_layer_sizes: Tuple[int, ...] = (256, 256)
 
     # Replay options
     min_replay_size: int = 10000
@@ -80,9 +80,9 @@ class ContrastiveConfig:
 
 
 def target_entropy_from_env_spec(
-        spec,
-        target_entropy_per_dimension=None,
-):
+        spec: specs.EnvironmentSpec,
+        target_entropy_per_dimension: Optional[float] = None,
+) -> float:
     """A heuristic to determine a target entropy.
 
     If target_entropy_per_dimension is not specified, the target entropy is
@@ -97,7 +97,7 @@ def target_entropy_from_env_spec(
       target entropy
     """
 
-    def get_num_actions(action_spec):
+    def get_num_actions(action_spec: Any) -> float:
         """Returns a number of actions in the spec."""
         if isinstance(action_spec, specs.BoundedArray):
             return onp.prod(action_spec.shape, dtype=int)

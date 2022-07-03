@@ -228,4 +228,4 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
         return adders_reverb.EpisodeAdder(
             client=replay_client,
             priority_fns={self._config.replay_table_name: None},
-            max_sequence_length=self._config.max_episode_steps + 1)
+            max_sequence_length=self._config.max_episode_steps + 1)  # (chongyiz): is this +1 redundant?

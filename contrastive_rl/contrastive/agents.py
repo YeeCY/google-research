@@ -20,7 +20,8 @@ from typing import Callable, Optional, Sequence
 
 from acme import specs
 from acme.jax import utils
-from acme.jax.layouts import distributed_layout
+# from acme.jax.layouts import distributed_layout
+from contrastive import distributed_layout
 from acme.utils import loggers
 
 from contrastive import builder
@@ -39,15 +40,16 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
 
     def __init__(
             self,
-            environment_factory,
-            network_factory,
-            config,
-            seed,
-            num_actors,
-            max_number_of_steps=None,
-            log_to_bigtable=False,
-            log_every=10.0,
-            evaluator_factories=None,
+            environment_factory: Callable[[int], dm_env.Environment],
+            network_factory: NetworkFactory,
+            config: contrastive_config.ContrastiveConfig,
+            seed: int,
+            num_actors: int,
+            max_number_of_steps: Optional[int] = None,
+            log_to_bigtable: bool = False,
+            log_every: float = 10.0,
+            evaluator_factories: Optional[Sequence[
+                distributed_layout.EvaluatorFactory]] = None,
     ):
         # Check that the environment-specific parts of the config have been set.
         assert config.max_episode_steps > 0
@@ -70,13 +72,25 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
                     start_index=config.start_index,
                     end_index=config.end_index)
             ]
+
+            def logger_fn(label, steps_key):
+                if config.load_rb:
+                    steps_key = 'learner_steps'
+                return loggers.make_default_logger(
+                    label,
+                    save_data=log_to_bigtable,
+                    time_delta=log_every,
+                    asynchronous=True,
+                    steps_key=steps_key)
+
             evaluator_factories = [
                 distributed_layout.default_evaluator_factory(
                     environment_factory=environment_factory,
                     network_factory=network_factory,
                     policy_factory=eval_policy_factory,
                     log_to_bigtable=log_to_bigtable,
-                    observers=eval_observers)
+                    observers=eval_observers,
+                    logger_fn=logger_fn)
             ]
             if config.local:
                 evaluator_factories = []
