@@ -34,6 +34,14 @@ import launchpad as lp
 
 FLAGS = flags.FLAGS
 flags.DEFINE_bool('debug', True, 'Runs training for just a few steps.')
+flags.DEFINE_string('log_dir', '~/contrastive_rl_logs',
+                    'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_bool('log_dir_add_uid', False,
+                  'If True adds a UID to the log path.')
+flags.DEFINE_string('env_name', 'sawyer_window',
+                    'Select an environment')
+flags.DEFINE_string('alo', 'contrastive_nce',
+                    'Select an algorithm to run the experiment')
 
 
 @functools.lru_cache()
@@ -107,7 +115,9 @@ def main(_):
     #                             medium_play,medium_diverse,
     #                             large_play,large_diverse}
     # env_name = 'sawyer_window'
-    env_name = 'offline_ant_umaze'
+    # env_name = 'offline_ant_umaze'
+    # env_name = 'ant_umaze'
+    env_name = FLAGS.env_name
     params = {
         'seed': 0,
         'use_random_actor': True,
@@ -123,7 +133,8 @@ def main(_):
     # Many other algorithms can be implemented by passing other parameters
     # or adding a few lines of code.
     # alg = 'contrastive_nce'
-    alg = 'c_learning'
+    # alg = 'c_learning'
+    alg = FLAGS.alg
     if alg == 'contrastive_nce':
         pass  # Just use the default hyperparameters
     elif alg == 'contrastive_cpc':

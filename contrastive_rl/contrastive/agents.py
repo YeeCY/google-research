@@ -50,6 +50,8 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
             log_every: float = 10.0,
             evaluator_factories: Optional[Sequence[
                 distributed_layout.EvaluatorFactory]] = None,
+            checkpointing_dir='~/contrastive_rl_logs',
+            checkpointing_add_uid=True,
     ):
         # Check that the environment-specific parts of the config have been set.
         assert config.max_episode_steps > 0
@@ -113,4 +115,5 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
             actor_logger_fn=distributed_layout.get_default_logger_fn(
                 log_to_bigtable, log_every),
             observers=actor_observers,
-            checkpointing_config=distributed_layout.CheckpointingConfig())
+            checkpointing_config=distributed_layout.CheckpointingConfig(
+                directory=checkpointing_dir, add_uid=checkpointing_add_uid))
