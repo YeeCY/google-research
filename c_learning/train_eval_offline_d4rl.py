@@ -333,7 +333,7 @@ def train_eval_offline(
         ])
         start_time = time.time()
         for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
-            discount = np.ones(len(traj['observation']), dtype=np.float32)
+            discount = np.ones(len(traj['observations']), dtype=np.float32)
             # discount[-1] = 0.0
             episode = trajectories.trajectory.from_episode(
                 observation=traj['observations'][..., indices].astype(np.float32), policy_info=(),
