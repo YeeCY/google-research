@@ -180,7 +180,8 @@ def load_antmaze_umaze_v2():
     #     non_zero_reset=True,
     #     dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5')
     gym_env = gym.make("antmaze-umaze-v2")
-    gym_env = c_learning_utils.AntMazeWrapper(gym_env.env)
+    # gym_env = c_learning_utils.AntMazeWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
 
     # env = suite_gym.wrap_env(
     #     gym_env,

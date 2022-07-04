@@ -32,6 +32,7 @@ import c_learning_envs
 import c_learning_utils
 import gin
 import numpy as np
+import tqdm
 import d4rl
 from six.moves import range
 import tensorflow as tf  # pylint: disable=g-explicit-tensorflow-version-import
@@ -332,10 +333,65 @@ def train_eval_offline(
         ])
         start_time = time.time()
         for traj in d4rl.sequence_dataset(tf_env.pyenv.envs[0]):
+            discount = np.ones(len(traj['observation']), dtype=np.float32)
+            # discount[-1] = 0.0
             episode = trajectories.trajectory.from_episode(
                 observation=traj['observations'][..., indices].astype(np.float32), policy_info=(),
-                action=traj['actions'].astype(np.float32), reward=traj['rewards'].astype(np.float32))
+                action=traj['actions'].astype(np.float32), reward=traj['rewards'].astype(np.float32),
+                discount=discount)
+            # episode.step_type[-1] = trajectories.StepType.LAST
             replay_buffer.add_episode(episode)
+
+        # dataset = tf_env.pyenv.envs[0].get_dataset()
+        # for t in tqdm.trange(dataset['observations'].shape[0]):
+        #     discount = 1.0
+        #     if t == 0 or dataset['timeouts'][t - 1]:
+        #         # step_type = trajectories.StepType.FIRST
+        #         # traj_id = np.random.randint(100)  # DELETEME (chongyiz): not used
+        #         traj = trajectories.first(
+        #             observation=dataset['observations'][t, indices].astype(np.float32),
+        #             action=dataset['actions'][t].astype(np.float32),
+        #             policy_info=(),
+        #             reward=dataset['rewards'][t].astype(np.float32),
+        #             discount=discount,
+        #         )
+        #     elif dataset['timeouts'][t]:
+        #         # step_type = trajectories.StepType.LAST
+        #         discount = 0.0
+        #         traj = trajectories.last(
+        #             observation=dataset['observations'][t, indices].astype(np.float32),
+        #             action=dataset['actions'][t].astype(np.float32),
+        #             policy_info=(),
+        #             reward=dataset['rewards'][t].astype(np.float32),
+        #             discount=discount,
+        #         )
+        #     else:
+        #         # step_type = trajectories.StepType.MID
+        #         traj = trajectories.mid(
+        #             observation=dataset['observations'][t, indices].astype(np.float32),
+        #             action=dataset['actions'][t].astype(np.float32),
+        #             policy_info=(),
+        #             reward=dataset['rewards'][t].astype(np.float32),
+        #             discount=discount,
+        #         )
+        #
+        #     # ts = trajectories.TimeStep(
+        #     #     step_type=step_type,
+        #     #     reward=dataset['rewards'][t],
+        #     #     discount=discount,
+        #     #     observation=np.concatenate([dataset['observations'][t], dataset['infos/goal'][t]]),
+        #     # )
+        #     # if t == 0 or dataset['timeouts'][t - 1]:
+        #     #     # replay_buffer.add_episode(ts)  # pytype: disable=attribute-error
+        #     #     # trajectories.trajectory.first()
+        #     #     traj = trajectories.first()
+        #     # else:
+        #     #     adder.add(action=dataset['actions'][t - 1], next_timestep=ts)  # pytype: disable=attribute-error
+        #     replay_buffer.add_batch(traj)
+        #
+        #     # if self._builder._config.local and t > 10_000:  # pytype: disable=attribute-error
+        #     #     break
+
         end_time = time.time()
         logging.info("Time to convert {} frames: {} sec".format(replay_buffer.num_frames(), end_time - start_time))
 

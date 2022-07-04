@@ -857,3 +857,38 @@ class AntMazeWrapper(gym.Wrapper):
         done = False
 
         return self._augment_goal(obs), reward, done, info
+
+
+class OfflineAntWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        env.observation_space = gym.spaces.Box(
+            low=np.full(58, -np.inf),
+            high=np.full(58, np.inf),
+            dtype=np.float32,
+        )
+        super(OfflineAntWrapper, self).__init__(env)
+
+    def get_dataset(self, **kwargs):
+        dataset = self.env.get_dataset(**kwargs)
+
+        N_samples = dataset['observations'].shape[0]
+        dataset['observations'] = np.concatenate([
+            dataset['observations'], dataset['infos/goal'],
+            np.zeros([N_samples, 27])], axis=-1)
+
+        return dataset
+
+    def observation(self, observation):
+        goal_obs = np.zeros_like(observation)
+        goal_obs[:2] = self.env.target_goal
+        return np.concatenate([observation, goal_obs])
+
+    def step(self, action):
+        observation, reward, _, info = self.env.step(action)
+        done = False
+
+        return self.observation(observation), reward, done, info
+
+    # @property
+    # def max_episode_steps(self):
+    #     return self.env.max_episode_steps
