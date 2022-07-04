@@ -173,9 +173,48 @@ def load_maze2d_large_v1():
     return tf_py_environment.TFPyEnvironment(env)
 
 
+def load_halfcheetah_medium_v2():
+    gym_env = gym.make("halfcheetah-medium-v2")
+
+    # obs = gym_env.reset()
+    # obs, reward, done, info = gym_env.step(gym_env.action_space.sample())
+
+    env = suite_gym.wrap_env(
+        gym_env.env,
+        max_episode_steps=1001,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+    # register(
+    #     id=env_name,
+    #     entry_point='d4rl.gym_mujoco.gym_envs:get_%s_env' % agent.replace('halfcheetah', 'cheetah').replace('walker2d',
+    #                                                                                                         'walker'),
+    #     max_episode_steps=1000,
+    #     kwargs={
+    #         'deprecated': version != 'v2',
+    #         'ref_min_score': infos.REF_MIN_SCORE[env_name],
+    #         'ref_max_score': infos.REF_MAX_SCORE[env_name],
+    #         'dataset_url': infos.DATASET_URLS[env_name]
+    #     }
+    # )
+
+
+def load_pen_human_v1():
+    gym_env = gym.make("pen-human-v1")
+    gym_env = c_learning_utils.OfflineAdroitWrapper(gym_env.env)
+
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=200,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
 def load_antmaze_umaze_v0():
     gym_env = gym.make("antmaze-umaze-v0")
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
 
     env = suite_gym.wrap_env(
         gym_env,
@@ -193,7 +232,7 @@ def load_antmaze_umaze_v2():
     #     dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_False_multigoal_False_sparse_fixed.hdf5')
     gym_env = gym.make("antmaze-umaze-v2")
     # gym_env = c_learning_utils.AntMazeWrapper(gym_env.env)
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
 
     # env = suite_gym.wrap_env(
     #     gym_env,
@@ -214,7 +253,7 @@ def load_antmaze_umaze_diverse_v2():
     #     non_zero_reset=True,
     #     dataset_url='http://rail.eecs.berkeley.edu/datasets/offline_rl/ant_maze_v2/Ant_maze_u-maze_noisy_multistart_True_multigoal_True_sparse_fixed.hdf5')
     gym_env = gym.make("antmaze-umaze-diverse-v2")
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=1001,
@@ -225,7 +264,7 @@ def load_antmaze_umaze_diverse_v2():
 
 def load_antmaze_medium_play_v2():
     gym_env = gym.make("antmaze-medium-play-v2")
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=1001,
@@ -238,7 +277,7 @@ def load_antmaze_medium_diverse_v2():
     # gym_env = AntMazeMediumDiverseV2()
     # gym_env = antmaze_env.AntMaze('medium', non_zero_reset=True)
     gym_env = gym.make("antmaze-medium-diverse-v2")
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=1001,
@@ -249,7 +288,7 @@ def load_antmaze_medium_diverse_v2():
 
 def load_antmaze_large_play_v2():
     gym_env = gym.make("antmaze-large-play-v2")
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=1001,
@@ -262,7 +301,7 @@ def load_antmaze_large_diverse_v2():
     # gym_env = AntMazeLargeDiverseV2()
     # gym_env = antmaze_env.AntMaze('large', non_zero_reset=True)
     gym_env = gym.make("antmaze-large-diverse-v2")
-    gym_env = c_learning_utils.OfflineAntWrapper(gym_env.env)
+    gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
     env = suite_gym.wrap_env(
         gym_env,
         max_episode_steps=1001,
@@ -327,6 +366,12 @@ def load(env_name, seed=None):
     elif env_name == 'maze2d-large-v1':
         tf_env = load_maze2d_large_v1()
         eval_tf_env = load_maze2d_large_v1()
+    elif env_name == 'halfcheetah-medium-v2':
+        tf_env = load_halfcheetah_medium_v2()
+        eval_tf_env = load_halfcheetah_medium_v2()
+    elif env_name == 'pen-human-v1':
+        tf_env = load_pen_human_v1()
+        eval_tf_env = load_pen_human_v1()
     elif env_name == 'antmaze-umaze-v0':
         tf_env = load_antmaze_umaze_v0()
         eval_tf_env = load_antmaze_umaze_v0()

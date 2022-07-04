@@ -332,7 +332,7 @@ def offline_goal_fn(experience,
 
         next_future_mask = np.zeros(batch_size, dtype=np.float32)
         next_future_mask[
-            relabel_orig_num + relabel_next_num:relabel_orig_num + relabel_next_num + relabel_next_future_num] = 1.0
+        relabel_orig_num + relabel_next_num:relabel_orig_num + relabel_next_num + relabel_next_future_num] = 1.0
         next_future_mask = tf.convert_to_tensor(next_future_mask)
         next_future_label = next_future_mask * CLearningGoalLabel.NEXT_FUTURE.value
 
@@ -696,6 +696,7 @@ class AverageNormalizedScore(tf_metric.TFStepMetric):
                 (self._ref_max_score - self._ref_min_score)
         self._buffer.add(score)
 
+
 # @gin.configurable
 # class CanonicalActionSpaceWrapper(PyEnvironmentBaseWrapper):
 #     def __init__(self, env, clip=False):
@@ -859,14 +860,14 @@ class AntMazeWrapper(gym.Wrapper):
         return self._augment_goal(obs), reward, done, info
 
 
-class OfflineAntWrapper(gym.ObservationWrapper):
+class OfflineAntMazeWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         env.observation_space = gym.spaces.Box(
             low=np.full(58, -np.inf),
             high=np.full(58, np.inf),
             dtype=np.float32,
         )
-        super(OfflineAntWrapper, self).__init__(env)
+        super(OfflineAntMazeWrapper, self).__init__(env)
 
     def get_dataset(self, **kwargs):
         dataset = self.env.get_dataset(**kwargs)
@@ -883,12 +884,54 @@ class OfflineAntWrapper(gym.ObservationWrapper):
         goal_obs[:2] = self.env.target_goal
         return np.concatenate([observation, goal_obs])
 
+    def reset(self):
+        obs = self.env.reset()
+
+        goal_obs = np.zeros_like(obs)
+        goal_obs[:2] = self.env.target_goal
+
+        return np.concatenate([obs, goal_obs])
+
     def step(self, action):
-        observation, reward, _, info = self.env.step(action)
+        obs, reward, _, info = self.env.step(action)
+
+        goal_obs = np.zeros_like(obs)
+        goal_obs[:2] = self.env.target_goal
         done = False
 
-        return self.observation(observation), reward, done, info
+        return np.concatenate([obs, goal_obs]), reward, done, info
 
-    # @property
-    # def max_episode_steps(self):
-    #     return self.env.max_episode_steps
+
+class OfflineAdroitWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        self.unwrapped_observation_space = self.observation_space
+        self.observation_space = gym.spaces.Box(
+            low=np.full(90, -np.inf),
+            high=np.full(90, np.inf),
+            dtype=np.float32
+        )
+
+    def _augment_goal(self, obs):
+        return np.concatenate([obs, np.zeros(45)], dtype=np.float32)
+
+    def get_dataset(self, **kwargs):
+        dataset = self.env.get_dataset(**kwargs)
+
+        N_samples = dataset['observations'].shape[0]
+        dataset['observations'] = np.concatenate([
+            dataset['observations'], np.zeros([N_samples, 45])], axis=-1)
+
+        return dataset
+
+    def reset(self):
+        obs = self.env.reset()
+
+        return self._augment_goal(obs)
+
+    def step(self, action):
+        obs, reward, _, info = self.env.step(action)
+        done = False
+
+        return self._augment_goal(obs), reward, done, info
