@@ -41,6 +41,8 @@ from tf_agents.policies import random_tf_policy
 from tf_agents.utils import common
 
 # limit gpu memory usage
+import offline_c_learning_agent
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
@@ -60,6 +62,7 @@ FLAGS = flags.FLAGS
 def vis_policy(
         load_dir,
         save_dir,
+        agent='c_learning_agent',
         video_filename='video.mp4',
         env_name='sawyer_reach',
         actor_fc_layers=(256, 256),
@@ -107,14 +110,30 @@ def vis_policy(
         action_fc_layer_params=critic_action_fc_layers,
         joint_fc_layer_params=critic_joint_fc_layers)
 
-    tf_agent = c_learning_agent.CLearningAgent(
-        time_step_spec,
-        action_spec,
-        actor_network=actor_net,
-        critic_network=critic_net,
-        actor_optimizer=None,
-        critic_optimizer=None,
-    )
+    if agent == 'c_learning_agent':
+        tf_agent = c_learning_agent.CLearningAgent(
+            time_step_spec,
+            action_spec,
+            actor_network=actor_net,
+            critic_network=critic_net,
+            actor_optimizer=None,
+            critic_optimizer=None,
+            obs_dim=obs_dim,
+        )
+    elif agent == 'offline_c_learning_agent':
+        tf_agent = offline_c_learning_agent.OfflineCLearningAgent(
+            time_step_spec,
+            action_spec,
+            actor_network=actor_net,
+            critic_network=critic_net,
+            behavioral_cloning_network=None,
+            actor_optimizer=None,
+            critic_optimizer=None,
+            behavioral_cloning_optimizer=None,
+            obs_dim=obs_dim,
+        )
+    else:
+        raise NotImplementedError
 
     # load learned agent
     train_checkpointer = common.Checkpointer(
