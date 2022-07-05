@@ -907,21 +907,38 @@ class OfflineAdroitWrapper(gym.Wrapper):
         super().__init__(env)
 
         self.unwrapped_observation_space = self.observation_space
-        self.observation_space = gym.spaces.Box(
-            low=np.full(90, -np.inf),
-            high=np.full(90, np.inf),
-            dtype=np.float32
-        )
+        if 'pen' in type(self.env).__name__.lower():
+            self.observation_space = gym.spaces.Box(
+                low=np.full(90, -np.inf),
+                high=np.full(90, np.inf),
+                dtype=np.float32
+            )
+        elif 'hammer' in type(self.env).__name__.lower():
+            self.observation_space = gym.spaces.Box(
+                low=np.full(92, -np.inf),
+                high=np.full(92, np.inf),
+                dtype=np.float32
+            )
 
     def _augment_goal(self, obs):
-        return np.concatenate([obs, np.zeros(45)], dtype=np.float32)
+        if 'pen' in type(self.env).__name__.lower():
+            return np.concatenate([obs, np.zeros(45)], dtype=np.float32)
+        elif 'hammer' in type(self.env).__name__.lower():
+            goal_pos = self.env.data.site_xpos[self.env.goal_sid].ravel()
+
+            return np.concatenate([obs, np.zeros(42), goal_pos, np.zeros(1)], dtype=np.float32)
 
     def get_dataset(self, **kwargs):
         dataset = self.env.get_dataset(**kwargs)
 
         N_samples = dataset['observations'].shape[0]
-        dataset['observations'] = np.concatenate([
-            dataset['observations'], np.zeros([N_samples, 45])], axis=-1)
+        if 'pen' in type(self.env).__name__.lower():
+            dataset['observations'] = np.concatenate([
+                dataset['observations'], np.zeros([N_samples, 45])], axis=-1)
+        # TODO (chongyiz): fix me
+        elif 'hammer' in type(self.env).__name__.lower():
+            dataset['observations'] = np.concatenate([
+                dataset['observations'], np.zeros([N_samples, 45])], axis=-1)
 
         return dataset
 

@@ -212,6 +212,45 @@ def load_pen_human_v1():
     return tf_py_environment.TFPyEnvironment(env)
 
 
+def load_hammer_human_v1():
+    gym_env = gym.make("hammer-human-v1")
+    gym_env = c_learning_utils.OfflineAdroitWrapper(gym_env.env)
+
+    gym_env.reset()
+    gym_env.step(gym_env.action_space.sample())
+
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=200,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_door_human_v1():
+    gym_env = gym.make("door-human-v1")
+    gym_env = c_learning_utils.OfflineAdroitWrapper(gym_env.env)
+
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=200,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
+def load_relocate_human_v1():
+    gym_env = gym.make("relocate-human-v1")
+    gym_env = c_learning_utils.OfflineAdroitWrapper(gym_env.env)
+
+    env = suite_gym.wrap_env(
+        gym_env,
+        max_episode_steps=200,
+    )
+
+    return tf_py_environment.TFPyEnvironment(env)
+
+
 def load_antmaze_umaze_v0():
     gym_env = gym.make("antmaze-umaze-v0")
     gym_env = c_learning_utils.OfflineAntMazeWrapper(gym_env.env)
@@ -372,6 +411,15 @@ def load(env_name, seed=None):
     elif env_name == 'pen-human-v1':
         tf_env = load_pen_human_v1()
         eval_tf_env = load_pen_human_v1()
+    elif env_name == 'hammer-human-v1':
+        tf_env = load_hammer_human_v1()
+        eval_tf_env = load_hammer_human_v1()
+    elif env_name == 'door-human-v1':
+        tf_env = load_door_human_v1()
+        eval_tf_env = load_door_human_v1()
+    elif env_name == 'relocate-human-v1':
+        tf_env = load_relocate_human_v1()
+        eval_tf_env = load_relocate_human_v1()
     elif env_name == 'antmaze-umaze-v0':
         tf_env = load_antmaze_umaze_v0()
         eval_tf_env = load_antmaze_umaze_v0()
