@@ -85,7 +85,7 @@ def vis_policy(
         env_name = env_name.replace('-', '.', 1)
 
     _, eval_tf_env, obs_dim = c_learning_envs.load(env_name, seed=random_seed)
-    eval_py_env = eval_tf_env.pyenv.envs[0]
+    # eval_py_env = eval_tf_env.pyenv.envs[0]
 
     time_step_spec = eval_tf_env.time_step_spec()
     observation_spec = time_step_spec.observation
@@ -145,15 +145,26 @@ def vis_policy(
     # eval_policy = random_tf_policy.RandomTFPolicy(
     #     eval_tf_env.time_step_spec(), eval_tf_env.action_spec())
 
+    def offscreen_render(env):
+        if 'pen' in env_name:
+            py_env = env.pyenv.envs[0]
+            frame = py_env.sim.render(width=640, height=480,
+                                      mode='offscreen', camera_name=None, device_id=0)
+            frame = frame[::-1, :, :]
+
+            return frame
+        else:
+            return env.render()
+
     video_path = os.path.join(save_dir, video_filename)
     with imageio.get_writer(video_path, fps=60) as video:
         for _ in range(num_episodes):
             time_step = eval_tf_env.reset()
-            video.append_data(eval_py_env.render())
+            video.append_data(offscreen_render(eval_tf_env))
             while not time_step.is_last():
                 action_step = eval_policy.action(time_step)
                 time_step = eval_tf_env.step(action_step.action)
-                video.append_data(eval_py_env.render())
+                video.append_data(offscreen_render(eval_tf_env))
     logging.info("Save video to: {}".format(os.path.abspath(video_path)))
 
 
