@@ -34,6 +34,6 @@ for bc_lambda in "${all_bc_lambdas[@]}"; do
       --gin_bindings="offline_c_learning_agent.critic_loss.policy_ratio=False" \
       --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0_bc_lambda="${bc_lambda}"/$seed \
     > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0_bc_lambda="${bc_lambda}"/$seed/stream.log 2>&1 & \
-    sleep 2
+    sleep 5
   done
 done

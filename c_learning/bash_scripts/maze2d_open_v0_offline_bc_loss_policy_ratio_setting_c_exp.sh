@@ -32,5 +32,5 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="offline_c_learning_agent.critic_loss.policy_log_ratio_clip_max=1" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_open_v0/$seed/stream.log 2>&1 & \
-  sleep 2
+  sleep 5
 done

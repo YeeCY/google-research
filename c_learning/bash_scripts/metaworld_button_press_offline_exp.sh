@@ -29,5 +29,5 @@ for seed in "${seeds[@]}"; do
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/metaworld_button_press/$seed \
     --dataset_dir=~/offline_c_learning/c_learning_logs/jun_21/metaworld_button_press/0/train \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/metaworld_button_press/$seed/stream.log 2>&1 & \
-  sleep 2
+  sleep 5
 done

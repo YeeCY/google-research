@@ -27,5 +27,5 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --root_dir ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/metaworld_assembly/$seed \
   > ~/offline_c_learning/c_learning_logs/"${EXP_LABEL}"/metaworld_assembly/$seed/stream.log 2>&1 & \
-  sleep 2
+  sleep 5
 done
