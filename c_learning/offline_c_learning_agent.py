@@ -475,8 +475,8 @@ class OfflineCLearningAgent(tf_agent.TFAgent):
     def behavioral_cloning_loss(self,
                                 time_steps,
                                 actions,
-                                mse_loss=True,
-                                mle_loss=False,
+                                mse_loss=False,
+                                mle_loss=True,
                                 weights=None):
         with tf.name_scope('behavioral_cloning'):
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)

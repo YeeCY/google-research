@@ -58,8 +58,10 @@ class CLearningAgent(tf_agent.TFAgent):
                  action_spec,
                  critic_network,
                  actor_network,
+                 behavioral_cloning_network,
                  actor_optimizer,
                  critic_optimizer,
+                 behavioral_cloning_optimizer,
                  obs_dim,
                  actor_loss_weight=1.0,
                  critic_loss_weight=0.5,
@@ -134,6 +136,10 @@ class CLearningAgent(tf_agent.TFAgent):
 
         self._check_action_spec(action_spec)
 
+        if behavioral_cloning_network:
+            behavioral_cloning_network.create_variables()
+        self._behavioral_cloning_network = behavioral_cloning_network
+
         self._critic_network_1 = critic_network
         self._critic_network_1.create_variables()
         if target_critic_network:
@@ -177,6 +183,7 @@ class CLearningAgent(tf_agent.TFAgent):
         self._target_update_period = target_update_period
         self._actor_optimizer = actor_optimizer
         self._critic_optimizer = critic_optimizer
+        self._behavioral_cloning_optimizer = behavioral_cloning_optimizer
 
         goal_start_index = gin.query_parameter('obs_to_goal.start_index')[0]
         goal_end_index = gin.query_parameter('obs_to_goal.end_index')[0]
@@ -251,6 +258,28 @@ class CLearningAgent(tf_agent.TFAgent):
         time_steps, policy_steps, next_time_steps = (
             trajectory.experience_to_transitions(experience, squeeze_time_dim))
         actions = policy_steps.action
+        next_actions = experience.action[:, -1]
+
+        # TODO (chongyiz): train the behavioral cloning agent
+        # behavioral_cloning_loss_info = self._behavioral_cloning_agent.train(
+        #     trajectory.from_transition(time_steps, policy_steps, next_time_steps))
+        trainable_behavioral_cloning_variables = \
+            self._behavioral_cloning_network.trainable_variables
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            assert trainable_behavioral_cloning_variables, ('No trainable behavioral cloning variables to '
+                                                            'optimize.')
+            tape.watch(trainable_behavioral_cloning_variables)
+            behavioral_cloning_loss = self.behavioral_cloning_loss(
+                time_steps,
+                actions,
+                weights=weights)
+
+        tf.debugging.check_numerics(behavioral_cloning_loss, 'Behavioral cloning is inf or nan.')
+        behavioral_cloning_grads = tape.gradient(
+            behavioral_cloning_loss, trainable_behavioral_cloning_variables)
+        self._apply_gradients(behavioral_cloning_grads,
+                              trainable_behavioral_cloning_variables,
+                              self._behavioral_cloning_optimizer)
 
         trainable_critic_variables = list(object_identity.ObjectIdentitySet(
             self._critic_network_1.trainable_variables +
@@ -264,6 +293,7 @@ class CLearningAgent(tf_agent.TFAgent):
                 time_steps,
                 actions,
                 next_time_steps,
+                next_actions,
                 td_errors_loss_fn=self._td_errors_loss_fn,
                 gamma=self._gamma,
                 weights=weights,
@@ -287,6 +317,9 @@ class CLearningAgent(tf_agent.TFAgent):
                               self._actor_optimizer)
 
         with tf.name_scope('Losses'):
+            tf.compat.v2.summary.scalar(
+                name="behavioral_cloning_loss", data=behavioral_cloning_loss,
+                step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
                 name='critic_loss', data=critic_loss, step=self.train_step_counter)
             tf.compat.v2.summary.scalar(
@@ -417,18 +450,74 @@ class CLearningAgent(tf_agent.TFAgent):
         action_distribution = self._train_policy.distribution(
             new_time_steps, policy_state=policy_state).action
 
+        cloning_network_state = self._behavioral_cloning_network.get_initial_state(
+            batch_size)
+        behavioral_cloning_action_distribution, _ = \
+            self._behavioral_cloning_network(
+                time_steps.observation[:, :self._obs_dim],
+                step_type=time_steps.step_type,
+                training=False,
+                network_state=cloning_network_state)
+
         # Get log_pis from transformed distribution.
         # actions = tf.nest.map_structure(lambda d: d.sample(), action_distribution)
         log_pi = common.log_probability(action_distribution, actions,
                                         self.action_spec)
+        log_pi_beta = common.log_probability(behavioral_cloning_action_distribution, actions,
+                                             self.action_spec)
 
-        return log_pi
+        return log_pi, log_pi_beta
+
+    @gin.configurable
+    def behavioral_cloning_loss(self,
+                                time_steps,
+                                actions,
+                                mse_loss=False,
+                                mle_loss=True,
+                                weights=None):
+        with tf.name_scope('behavioral_cloning'):
+            # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
+            # nest_utils.assert_same_structure(actions, self.action_spec)
+
+            # TODO (chongyiz): remove goal from the observations
+            # batch_size = nest_utils.get_outer_shape(time_steps, self._time_step_spec)[0]
+            batch_size = time_steps.observation.shape[0]
+            network_state = self._behavioral_cloning_network.get_initial_state(batch_size)
+            bc_output, _ = self._behavioral_cloning_network(
+                time_steps.observation[:, :self._obs_dim],
+                step_type=time_steps.step_type,
+                training=True,
+                network_state=network_state)
+
+            if mse_loss:
+                bc_action = bc_output.sample()
+                bc_loss = tf.nest.map_structure(tf.losses.mse, actions, bc_action)
+
+            if mle_loss:
+                log_pi = common.log_probability(bc_output, actions,
+                                                self.action_spec)
+                bc_loss = -log_pi
+
+            if bc_loss.shape.rank > 1:
+                # Sum over the time dimension.
+                bc_loss = tf.reduce_sum(
+                    bc_loss, axis=range(1, bc_loss.shape.rank))
+
+            agg_loss = common.aggregate_losses(
+                per_example_loss=bc_loss,
+                sample_weight=weights,
+                regularization_loss=(self._critic_network_1.losses +
+                                     self._critic_network_2.losses))
+            bc_loss = agg_loss.total_loss
+
+        return bc_loss
 
     @gin.configurable
     def critic_loss(self,
                     time_steps,
                     actions,
                     next_time_steps,
+                    next_actions,
                     td_errors_loss_fn,
                     gamma=1.0,
                     weights=None,
@@ -436,6 +525,7 @@ class CLearningAgent(tf_agent.TFAgent):
                     w_clipping=20.0,
                     self_normalized=False,
                     lambda_fix=False,
+                    sarsa_q=False,
                     ):
         """Computes the critic loss for C-learning training.
 
@@ -470,7 +560,8 @@ class CLearningAgent(tf_agent.TFAgent):
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
             # nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
-            next_actions, _, _ = self._actions_log_probs_and_entropy(next_time_steps)
+            if not sarsa_q:
+                next_actions, _, _ = self._actions_log_probs_and_entropy(next_time_steps)
             target_input = (
                 next_time_steps.observation[:, :self._obs_dim + self._goal_dim],
                 next_actions
@@ -550,22 +641,22 @@ class CLearningAgent(tf_agent.TFAgent):
             pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
             # [1, ..., 1, 0, ..., 0]
             first_half_batch_mask = next_time_steps.reward
-            first_half_batch_mask = tf.concat([tf.ones(half_batch),
-                                               first_half_batch_mask[half_batch:]], axis=0)
+            # first_half_batch_mask = tf.concat([tf.ones(half_batch),
+            #                                    first_half_batch_mask[half_batch:]], axis=0)
             # [0, ..., 0, 1, ..., 1]
             second_half_batch_mask = 1 - next_time_steps.reward
-            second_half_batch_mask = tf.concat([tf.zeros(half_batch),
-                                                second_half_batch_mask[half_batch:]], axis=0)
+            # second_half_batch_mask = tf.concat([tf.zeros(half_batch),
+            #                                     second_half_batch_mask[half_batch:]], axis=0)
             critic_loss1 = \
                 -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
-                second_half_batch_mask * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
-                second_half_batch_mask * tf.stop_gradient(y) * tf.math.log(pred_td_targets1 + EPSILON)
+                second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
+                second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
             # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
             #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
             critic_loss2 = \
                 -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
-                second_half_batch_mask * tf.stop_gradient(1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
-                second_half_batch_mask * tf.stop_gradient(y) * tf.math.log(pred_td_targets2 + EPSILON)
+                second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
+                second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
             # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
             #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
 
@@ -646,10 +737,12 @@ class CLearningAgent(tf_agent.TFAgent):
                    time_steps,
                    actions,
                    weights=None,
-                   ce_loss=False,
+                   log_ratio_loss=False,
                    mse_bc_loss=False,
                    mle_bc_loss=False,
                    bc_lambda=0.25,
+                   reverse_kl_loss=False,
+                   reverse_kl_lambda=0.25,
                    aw_loss=False,
                    aw_lambda=0.5):
         """Computes the actor_loss for C-learning training.
@@ -682,21 +775,34 @@ class CLearningAgent(tf_agent.TFAgent):
             sampled_q_values2, _ = self._critic_network_2(
                 sampled_target_input, time_steps.step_type, training=False)
             sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
-            if ce_loss:
-                actor_loss = tf.keras.losses.binary_crossentropy(
-                    tf.ones_like(sampled_q_values), sampled_q_values)
+            if log_ratio_loss:
+                # actor_loss = tf.keras.losses.binary_crossentropy(
+                #     tf.ones_like(sampled_q_values), sampled_q_values)
+                # actor_loss = tf.keras.losses.binary_crossentropy(
+                #     tf.ones_like(sampled_q_values), sampled_q_values) - \
+                #              tf.keras.losses.binary_crossentropy(
+                #                  tf.zeros_like(sampled_q_values), 1 - sampled_q_values)
+                actor_loss = -tf.math.log(sampled_q_values) + tf.math.log(1 - sampled_q_values)
             else:
                 actor_loss = -1.0 * sampled_q_values
 
             if mse_bc_loss:
-                actor_loss += bc_lambda * tf.losses.mse(actions, sampled_actions)
+                actor_loss = tf.reduce_mean(actor_loss) + \
+                             bc_lambda * tf.losses.mse(actions, sampled_actions)
 
             if mle_bc_loss:
-                log_pi = self._log_probs(time_steps, actions, future_goal=True)
-                actor_loss -= bc_lambda * log_pi
+                # try future goal for Goal-conditioned BC
+                log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
+                actor_loss = tf.reduce_mean(actor_loss - bc_lambda * log_pi)
+
+            if reverse_kl_loss:
+                _, sampled_log_pi_beta = self._log_probs(time_steps, sampled_actions)
+                actor_loss = tf.reduce_mean(
+                    actor_loss + reverse_kl_lambda * (-sampled_log_pi_beta + sampled_log_pi)
+                )
 
             if aw_loss:
-                log_pi = self._log_probs(time_steps, actions, future_goal=True)
+                log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
 
                 # TODO (chongyiz): use only future goals instead of relabeled goals
                 target_input = (

@@ -180,10 +180,13 @@ def train_eval_offline(
                 action_spec,
                 actor_network=actor_net,
                 critic_network=critic_net,
+                behavioral_cloning_network=behavioral_cloning_net,
                 actor_optimizer=tf.compat.v1.train.AdamOptimizer(
                     learning_rate=actor_learning_rate),
                 critic_optimizer=tf.compat.v1.train.AdamOptimizer(
                     learning_rate=critic_learning_rate),
+                behavioral_cloning_optimizer=tf.compat.v1.train.AdamOptimizer(
+                    learning_rate=behavioral_cloning_learning_rate),
                 obs_dim=obs_dim,
                 target_update_tau=target_update_tau,
                 target_update_period=target_update_period,
