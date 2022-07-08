@@ -799,7 +799,7 @@ class CLearningAgent(tf_agent.TFAgent):
                 actor_loss += -bc_lambda * tf.reduce_mean(log_pi)
 
             if reverse_kl_loss:
-                _, sampled_log_pi_beta = self._log_probs(
+                sampled_log_pi, sampled_log_pi_beta = self._log_probs(
                     time_steps, sampled_actions, future_goal=True)
                 actor_loss += reverse_kl_lambda * tf.reduce_mean(
                     -sampled_log_pi_beta + sampled_log_pi)
