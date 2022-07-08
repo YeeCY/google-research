@@ -424,6 +424,20 @@ class CLearningAgent(tf_agent.TFAgent):
 
         return actions, log_pi, entropy
 
+    def _behavioral_actions(self, time_steps):
+        batch_size = time_steps.observation.shape[0]
+        cloning_network_state = self._behavioral_cloning_network.get_initial_state(
+            batch_size)
+        behavioral_cloning_action_distribution, _ = \
+            self._behavioral_cloning_network(
+                time_steps.observation[:, :self._obs_dim],
+                step_type=time_steps.step_type,
+                training=False,
+                network_state=cloning_network_state)
+        bc_actions = behavioral_cloning_action_distribution.sample()
+
+        return bc_actions
+
     def _log_probs(self, time_steps, actions, future_goal=False):
         """Get log probabilities of actions from policy."""
         # Get raw action distribution from policy, and initialize bijectors list.
@@ -526,6 +540,8 @@ class CLearningAgent(tf_agent.TFAgent):
                     self_normalized=False,
                     lambda_fix=False,
                     sarsa_q=False,
+                    sampled_next_action=False,
+                    use_mc=False,
                     ):
         """Computes the critic loss for C-learning training.
 
@@ -560,7 +576,13 @@ class CLearningAgent(tf_agent.TFAgent):
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
             # nest_utils.assert_same_structure(next_time_steps, self.time_step_spec)
 
-            if not sarsa_q:
+            # TODO (chongyiz): we have two option here -
+            #  (a) use next_action from the dataset
+            #  (b) sample next_action from the behavioral cloning network
+            if sarsa_q:
+                if sampled_next_action:
+                    next_actions = self._behavioral_actions(next_time_steps)
+            else:
                 next_actions, _, _ = self._actions_log_probs_and_entropy(next_time_steps)
             target_input = (
                 next_time_steps.observation[:, :self._obs_dim + self._goal_dim],
@@ -593,7 +615,7 @@ class CLearningAgent(tf_agent.TFAgent):
             float_batch_size = tf.cast(batch_size, float)
             num_next = tf.cast(tf.round(float_batch_size * rnp), tf.int32)
             num_future = tf.cast(tf.round(float_batch_size * rfp), tf.int32)
-            if lambda_fix:
+            if lambda_fix or use_mc:
                 lambda_coef = 2 * rnp
                 weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
                                      tf.fill((num_future,), 1.0),
@@ -611,7 +633,7 @@ class CLearningAgent(tf_agent.TFAgent):
             # indicate task success during evaluation. In the evaluation setting,
             # task success depends on the task, but we don't want the termination
             # here to depend on the task. Hence, we ignored it.
-            if lambda_fix:
+            if lambda_fix or use_mc:
                 lambda_coef = 2 * rnp
                 y = lambda_coef * gamma * w / (1 + lambda_coef * gamma * w)
             else:
@@ -629,38 +651,39 @@ class CLearningAgent(tf_agent.TFAgent):
             pred_td_targets2, _ = self._critic_network_2(
                 pred_input, time_steps.step_type, training=training)
 
+            # TODO (chongyiz): try original C-learning critic loss again
             # (chongyiz): cross-entropy implementation of the classifier loss
-            # ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
-            # ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
-            # critic_loss = ce_critic_loss1 + ce_critic_loss2
+            ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
+            ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+            critic_loss = ce_critic_loss1 + ce_critic_loss2
 
-            # (chongyiz): three term implementation of the classifier loss,
-            # this implementation is similar to https://github.com/keras-team/keras/blob/v2.9.0/keras/losses.py#L496-L596,
-            # which will be more numerical stable.
-            pred_td_targets1 = tf.clip_by_value(pred_td_targets1, EPSILON, 1. - EPSILON)
-            pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
-            # [1, ..., 1, 0, ..., 0]
-            first_half_batch_mask = next_time_steps.reward
-            # first_half_batch_mask = tf.concat([tf.ones(half_batch),
-            #                                    first_half_batch_mask[half_batch:]], axis=0)
-            # [0, ..., 0, 1, ..., 1]
-            second_half_batch_mask = 1 - next_time_steps.reward
-            # second_half_batch_mask = tf.concat([tf.zeros(half_batch),
-            #                                     second_half_batch_mask[half_batch:]], axis=0)
-            critic_loss1 = \
-                -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
-                second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
-                second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
-            # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
-            #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
-            critic_loss2 = \
-                -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
-                second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
-                second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
-            # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
-            #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
-
-            critic_loss = critic_loss1 + critic_loss2
+            # # (chongyiz): three term implementation of the classifier loss,
+            # # this implementation is similar to https://github.com/keras-team/keras/blob/v2.9.0/keras/losses.py#L496-L596,
+            # # which will be more numerical stable.
+            # pred_td_targets1 = tf.clip_by_value(pred_td_targets1, EPSILON, 1. - EPSILON)
+            # pred_td_targets2 = tf.clip_by_value(pred_td_targets2, EPSILON, 1. - EPSILON)
+            # # [1, ..., 1, 0, ..., 0]
+            # first_half_batch_mask = next_time_steps.reward
+            # # first_half_batch_mask = tf.concat([tf.ones(half_batch),
+            # #                                    first_half_batch_mask[half_batch:]], axis=0)
+            # # [0, ..., 0, 1, ..., 1]
+            # second_half_batch_mask = 1 - next_time_steps.reward
+            # # second_half_batch_mask = tf.concat([tf.zeros(half_batch),
+            # #                                     second_half_batch_mask[half_batch:]], axis=0)
+            # critic_loss1 = \
+            #     -first_half_batch_mask * tf.math.log(pred_td_targets1 + EPSILON) - \
+            #     second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets1 + EPSILON) - \
+            #     second_half_batch_mask * y * tf.math.log(pred_td_targets1 + EPSILON)
+            # # tf.debugging.assert_near(ce_critic_loss1, critic_loss1,
+            # #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+            # critic_loss2 = \
+            #     -first_half_batch_mask * tf.math.log(pred_td_targets2 + EPSILON) - \
+            #     second_half_batch_mask * (1 - y) * tf.math.log(1 - pred_td_targets2 + EPSILON) - \
+            #     second_half_batch_mask * y * tf.math.log(pred_td_targets2 + EPSILON)
+            # # tf.debugging.assert_near(ce_critic_loss2, critic_loss2,
+            # #                          rtol=tf.constant(EPSILON), atol=tf.constant(EPSILON))
+            #
+            # critic_loss = critic_loss1 + critic_loss2
 
             if critic_loss.shape.rank > 1:
                 # Sum over the time dimension.
