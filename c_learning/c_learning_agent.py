@@ -541,7 +541,7 @@ class CLearningAgent(tf_agent.TFAgent):
                     lambda_fix=False,
                     sarsa_q=False,
                     sampled_next_action=False,
-                    use_mc=False,
+                    mc_q=False,
                     ):
         """Computes the critic loss for C-learning training.
 
@@ -571,6 +571,8 @@ class CLearningAgent(tf_agent.TFAgent):
         rfp = gin.query_parameter('goal_fn.relabel_future_prob')
         rnp = gin.query_parameter('goal_fn.relabel_next_prob')
         assert rfp + rnp == 0.5
+        if mc_q:
+            assert rfp == 0.5  # only use future goals to construct MC critic loss
         with tf.name_scope('critic_loss'):
             # nest_utils.assert_same_structure(actions, self.action_spec)
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
@@ -615,7 +617,7 @@ class CLearningAgent(tf_agent.TFAgent):
             float_batch_size = tf.cast(batch_size, float)
             num_next = tf.cast(tf.round(float_batch_size * rnp), tf.int32)
             num_future = tf.cast(tf.round(float_batch_size * rfp), tf.int32)
-            if lambda_fix or use_mc:
+            if lambda_fix or mc_q:
                 lambda_coef = 2 * rnp
                 weights = tf.concat([tf.fill((num_next,), (1 - gamma)),
                                      tf.fill((num_future,), 1.0),
@@ -633,7 +635,7 @@ class CLearningAgent(tf_agent.TFAgent):
             # indicate task success during evaluation. In the evaluation setting,
             # task success depends on the task, but we don't want the termination
             # here to depend on the task. Hence, we ignored it.
-            if lambda_fix or use_mc:
+            if lambda_fix or mc_q:
                 lambda_coef = 2 * rnp
                 y = lambda_coef * gamma * w / (1 + lambda_coef * gamma * w)
             else:
