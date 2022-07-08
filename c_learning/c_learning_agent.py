@@ -782,24 +782,27 @@ class CLearningAgent(tf_agent.TFAgent):
                 #     tf.ones_like(sampled_q_values), sampled_q_values) - \
                 #              tf.keras.losses.binary_crossentropy(
                 #                  tf.zeros_like(sampled_q_values), 1 - sampled_q_values)
-                actor_loss = -tf.math.log(sampled_q_values) + tf.math.log(1 - sampled_q_values)
+                # actor_loss = -tf.math.log(sampled_q_values) + tf.math.log(1 - sampled_q_values)
+                actor_loss = tf.keras.losses.binary_crossentropy(
+                    tf.ones_like(sampled_q_values), sampled_q_values) - \
+                             tf.keras.losses.binary_crossentropy(
+                                 tf.zeros_like(sampled_q_values), sampled_q_values)
             else:
                 actor_loss = -1.0 * sampled_q_values
 
             if mse_bc_loss:
-                actor_loss = tf.reduce_mean(actor_loss) + \
-                             bc_lambda * tf.losses.mse(actions, sampled_actions)
+                actor_loss += bc_lambda * tf.losses.mse(actions, sampled_actions)
 
             if mle_bc_loss:
                 # try future goal for Goal-conditioned BC
                 log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
-                actor_loss = tf.reduce_mean(actor_loss - bc_lambda * log_pi)
+                actor_loss += -bc_lambda * tf.reduce_mean(log_pi)
 
             if reverse_kl_loss:
-                _, sampled_log_pi_beta = self._log_probs(time_steps, sampled_actions)
-                actor_loss = tf.reduce_mean(
-                    actor_loss + reverse_kl_lambda * (-sampled_log_pi_beta + sampled_log_pi)
-                )
+                _, sampled_log_pi_beta = self._log_probs(
+                    time_steps, sampled_actions, future_goal=True)
+                actor_loss += reverse_kl_lambda * tf.reduce_mean(
+                    -sampled_log_pi_beta + sampled_log_pi)
 
             if aw_loss:
                 log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
