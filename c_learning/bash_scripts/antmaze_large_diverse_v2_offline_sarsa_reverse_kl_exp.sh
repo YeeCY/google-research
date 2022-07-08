@@ -28,8 +28,8 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --gin_bindings="c_learning_agent.critic_loss.sarsa_q=True" \
     --gin_bindings="c_learning_agent.actor_loss.log_ratio_loss=True" \
-    --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \
-    --gin_bindings="c_learning_agent.actor_loss.bc_lambda=0.25" \
+    --gin_bindings="c_learning_agent.actor_loss.reverse_kl_loss=True" \
+    --gin_bindings="c_learning_agent.actor_loss.reverse_kl_lambda=1.0" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_large_diverse_v2/$seed \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_large_diverse_v2/$seed/stream.log 2>&1 & \
   sleep 5

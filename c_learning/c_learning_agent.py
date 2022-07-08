@@ -783,28 +783,33 @@ class CLearningAgent(tf_agent.TFAgent):
                 #              tf.keras.losses.binary_crossentropy(
                 #                  tf.zeros_like(sampled_q_values), 1 - sampled_q_values)
                 # actor_loss = -tf.math.log(sampled_q_values) + tf.math.log(1 - sampled_q_values)
-                actor_loss = tf.keras.losses.binary_crossentropy(
+                log_ratio_loss_val = tf.keras.losses.binary_crossentropy(
                     tf.ones_like(sampled_q_values), sampled_q_values) - \
                              tf.keras.losses.binary_crossentropy(
                                  tf.zeros_like(sampled_q_values), sampled_q_values)
+                actor_loss = log_ratio_loss_val
             else:
-                actor_loss = -1.0 * sampled_q_values
+                ratio_loss = -1.0 * sampled_q_values
+                actor_loss = ratio_loss
 
             if mse_bc_loss:
-                actor_loss += bc_lambda * tf.losses.mse(actions, sampled_actions)
+                mse_bc_loss_val = bc_lambda * tf.losses.mse(actions, sampled_actions)
+                actor_loss += mse_bc_loss_val
 
             if mle_bc_loss:
                 # try future goal for Goal-conditioned BC
                 log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
-                actor_loss += -bc_lambda * tf.reduce_mean(log_pi)
+                mle_bc_loss_val = -bc_lambda * tf.reduce_mean(log_pi)
+                actor_loss += mle_bc_loss_val
 
             if reverse_kl_loss:
                 sampled_actions, sampled_log_pi, _ = \
                     self._actions_log_probs_and_entropy(time_steps, future_goal=True)
                 _, sampled_log_pi_beta = self._log_probs(
                     time_steps, sampled_actions, future_goal=True)
-                actor_loss += reverse_kl_lambda * tf.reduce_mean(
+                reverse_kl_loss_val = reverse_kl_lambda * tf.reduce_mean(
                     -sampled_log_pi_beta + sampled_log_pi)
+                actor_loss += reverse_kl_loss_val
 
             if aw_loss:
                 log_pi, _ = self._log_probs(time_steps, actions, future_goal=True)
@@ -843,6 +848,26 @@ class CLearningAgent(tf_agent.TFAgent):
                 name='policy_entropy',
                 data=tf.reduce_mean(sampled_entropy),
                 step=self.train_step_counter)
+            if log_ratio_loss:
+                tf.compat.v2.summary.scalar(
+                    name='log_ratio_loss',
+                    data=log_ratio_loss_val,
+                    step=self.train_step_counter)
+            if mse_bc_loss:
+                tf.compat.v2.summary.scalar(
+                    name='mse_bc_loss',
+                    data=mse_bc_loss_val,
+                    step=self.train_step_counter)
+            if mle_bc_loss:
+                tf.compat.v2.summary.scalar(
+                    name='mle_bc_loss',
+                    data=mle_bc_loss_val,
+                    step=self.train_step_counter)
+            if reverse_kl_loss:
+                tf.compat.v2.summary.scalar(
+                    name='reverse_kl_loss',
+                    data=reverse_kl_loss_val,
+                    step=self.train_step_counter)
 
             return actor_loss
 
