@@ -33,7 +33,7 @@ for bc_lambda in "${all_bc_lambdas[@]}"; do
       --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \
       --gin_bindings="c_learning_agent.actor_loss.bc_lambda=${bc_lambda}" \
       --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1_bc_lambda="${bc_lambda}"/$seed \
-    > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1_bc_lambda="${bc_lambc_lambdabda}"/$seed/stream.log 2>&1 & \
+    > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/maze2d_medium_v1_bc_lambda="${bc_lambda}"/$seed/stream.log 2>&1 & \
     sleep 5
   done
 done
