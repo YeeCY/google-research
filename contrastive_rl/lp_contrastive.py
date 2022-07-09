@@ -25,6 +25,7 @@ Run using multi-threading
 """
 import functools
 from typing import Any, Dict
+import numpy as np
 
 from absl import app
 from absl import flags
@@ -66,6 +67,7 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
     if env_name.startswith('offline_ant'):
         # No actors needed for the offline RL experiments. Evaluation is handled separately.
         params['num_actors'] = 0
+        params['samples_per_insert_tolerance_rate'] = np.inf
 
     config = contrastive.ContrastiveConfig(**params)
 
