@@ -68,6 +68,7 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
         # No actors needed for the offline RL experiments. Evaluation is
         # handled separately.
         params['num_actors'] = 0
+        params['steps_key'] = 'learner_steps'
 
     config = contrastive.ContrastiveConfig(**params)
 

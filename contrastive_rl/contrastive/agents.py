@@ -114,4 +114,5 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
                 log_to_bigtable, log_every),
             observers=actor_observers,
             checkpointing_config=distributed_layout.CheckpointingConfig(
-                directory=checkpointing_dir, add_uid=checkpointing_add_uid))
+                directory=checkpointing_dir, add_uid=checkpointing_add_uid),
+            steps_key=config.steps_key)

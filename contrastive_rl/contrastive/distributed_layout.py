@@ -142,7 +142,8 @@ class DistributedLayout:
             max_number_of_steps: Optional[int] = None,
             observers: Sequence[observers_lib.EnvLoopObserver] = (),
             multithreading_colocate_learner_and_reverb: bool = False,
-            checkpointing_config: Optional[CheckpointingConfig] = None):
+            checkpointing_config: Optional[CheckpointingConfig] = None,
+            steps_key: str = 'actor_steps'):
 
         if prefetch_size < 0:
             raise ValueError(f'Prefetch size={prefetch_size} should be non negative')
@@ -166,6 +167,7 @@ class DistributedLayout:
         self._multithreading_colocate_learner_and_reverb = (
             multithreading_colocate_learner_and_reverb)
         self._checkpointing_config = checkpointing_config
+        self._steps_key = steps_key
 
     def replay(self):
         """The replay storage."""
@@ -287,8 +289,8 @@ class DistributedLayout:
         return environment_loop.EnvironmentLoop(environment, actor, counter,
                                                 logger, observers=self._observers)
 
-    def coordinator(self, counter: counting.Counter, max_actor_steps: int):
-        return lp_utils.StepsLimiter(counter, max_actor_steps)
+    def coordinator(self, counter: counting.Counter, max_steps: int, steps_key: str = 'actor_steps'):
+        return lp_utils.StepsLimiter(counter, max_steps, steps_key=steps_key)
 
     def build(self, name='agent', program: Optional[lp.Program] = None):
         """Build the distributed agent topology."""
@@ -309,7 +311,8 @@ class DistributedLayout:
             if self._max_number_of_steps is not None:
                 _ = program.add_node(
                     lp.CourierNode(self.coordinator, counter,
-                                   self._max_number_of_steps))
+                                   self._max_number_of_steps,
+                                   self._steps_key))
 
         learner_key, key = jax.random.split(key)
         learner_node = lp.CourierNode(self.learner, learner_key, replay, counter)
