@@ -178,6 +178,7 @@ def main(_):
         params.update({
             'min_replay_size': 10_000,
             'local': True,
+            'jit': False,
             'num_sgd_steps_per_step': 1,
             'prefetch_size': 1,
             'num_actors': 1,
