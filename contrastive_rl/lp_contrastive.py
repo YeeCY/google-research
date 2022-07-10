@@ -65,9 +65,9 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
         params['num_actors'] = 10
 
     if env_name.startswith('offline_ant'):
-        # No actors needed for the offline RL experiments. Evaluation is handled separately.
+        # No actors needed for the offline RL experiments. Evaluation is
+        # handled separately.
         params['num_actors'] = 0
-        params['samples_per_insert_tolerance_rate'] = np.inf
 
     config = contrastive.ContrastiveConfig(**params)
 
@@ -82,7 +82,8 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
     config.obs_dim = obs_dim
     config.max_episode_steps = getattr(environment, '_step_limit') + 1
     if env_name == 'offline_ant_umaze_diverse':
-        config.max_episode_steps = 1000  # This environment terminates after 700 steps, but the demos have length 1000 steps.
+        # This environment terminates after 700 steps, but demos have 1000 steps.
+        config.max_episode_steps = 1000
     network_factory = functools.partial(
         contrastive.make_networks, obs_dim=obs_dim, repr_dim=config.repr_dim,
         repr_norm=config.repr_norm, twin_q=config.twin_q,
@@ -128,8 +129,9 @@ def main(_):
         'env_name': env_name,
         'max_number_of_steps': 1_000_000,
         'use_image_obs': 'image' in env_name,
-        'end_index': 2,  # Just for the antmaze environments,
     }
+    if 'ant_' in env_name:
+        params['end_index'] = 2
 
     # 2. Select an algorithm. The currently-supported algorithms are:
     # contrastive_nce, contrastive_cpc, c_learning, nce+c_learning, gcbc.
@@ -154,6 +156,22 @@ def main(_):
     else:
         raise NotImplementedError('Unknown method: %s' % alg)
 
+    # For the offline RL experiments, modify some hyperparameters.
+    if env_name.startswith('offline_ant'):
+        params.update({
+            # Effectively remove the rate-limiter by using very large values.
+            'samples_per_insert': 1_000_000,
+            'samples_per_insert_tolerance_rate': 100_000_000.0,
+            # For the actor update, only use future states as goals.
+            'random_goals': 0.0,
+            'bc_coef': 0.05,  # Add a behavioral cloning term to the actor.
+            'twin_q': True,  # Learn two critics, and take the minimum.
+            'batch_size': 1024,  # Increase the batch size 256 --> 1024.
+            'repr_dim': 16,  # Decrease the representation size 64 --> 16.
+            # Increase the policy network size (256, 256) --> (1024, 1024)
+            'hidden_layer_sizes': (1024, 1024),
+        })
+
     # 3. Select compute parameters. The default parameters are already tuned, so
     # use this mainly for debugging.
     if FLAGS.debug:
@@ -166,6 +184,7 @@ def main(_):
             'batch_size': 32,
             'max_number_of_steps': 10_000,
             'samples_per_insert_tolerance_rate': 1.0,
+            'hidden_layer_sizes': (32, 32),
         })
 
     program = get_program(params)
