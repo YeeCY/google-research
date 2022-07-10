@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import os
 
-import ant_envs
+import ant_env
 import fetch_envs
 import gym
 import metaworld
@@ -35,22 +35,23 @@ def euler2quat(euler):
     euler = np.asarray(euler, dtype=np.float64)
     assert euler.shape[-1] == 3, 'Invalid shape euler {}'.format(euler)
 
-    ai, aj, ak = euler[..., 2] / 2, -euler[..., 1] / 2, euler[..., 0] / 2
+    ai, aj, ak = euler[Ellipsis, 2] / 2, -euler[Ellipsis, 1] / 2, euler[Ellipsis, 0] / 2
     si, sj, sk = np.sin(ai), np.sin(aj), np.sin(ak)
     ci, cj, ck = np.cos(ai), np.cos(aj), np.cos(ak)
     cc, cs = ci * ck, ci * sk
     sc, ss = si * ck, si * sk
 
     quat = np.empty(euler.shape[:-1] + (4,), dtype=np.float64)
-    quat[..., 0] = cj * cc + sj * ss
-    quat[..., 3] = cj * sc - sj * cs
-    quat[..., 2] = -(cj * ss + sj * cc)
-    quat[..., 1] = cj * cs - sj * sc
+    quat[Ellipsis, 0] = cj * cc + sj * ss
+    quat[Ellipsis, 3] = cj * sc - sj * cs
+    quat[Ellipsis, 2] = -(cj * ss + sj * cc)
+    quat[Ellipsis, 1] = cj * cs - sj * sc
     return quat
 
 
 def load(env_name):
     """Loads the train and eval environments, as well as the obs_dim."""
+    # pylint: disable=invalid-name
     kwargs = {}
     if env_name == 'sawyer_push':
         CLASS = SawyerPush
@@ -95,7 +96,7 @@ def load(env_name):
     elif env_name.startswith('ant_'):
         _, map_name = env_name.split('_')
         assert map_name in ['umaze', 'medium', 'large']
-        CLASS = ant_envs.AntMaze
+        CLASS = ant_env.AntMaze
         kwargs['map_name'] = map_name
         kwargs['non_zero_reset'] = True
         if map_name == 'umaze':
@@ -103,7 +104,7 @@ def load(env_name):
         else:
             max_episode_steps = 1000
     elif env_name.startswith('offline_ant'):
-        CLASS = lambda: ant_envs.make_offline_ant(env_name)
+        CLASS = lambda: ant_env.make_offline_ant(env_name)
         if 'umaze' in env_name:
             max_episode_steps = 700
         else:

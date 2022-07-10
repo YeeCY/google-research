@@ -111,6 +111,8 @@ class AntMaze(d4rl.locomotion.ant.AntMazeEnv):
 
 
 class OfflineAntWrapper(gym.ObservationWrapper):
+    """Wrapper for exposing the goals of the AntMaze environments."""
+
     def __init__(self, env):
         env.observation_space = gym.spaces.Box(
             low=-1.0 * np.ones(58),
@@ -130,6 +132,7 @@ class OfflineAntWrapper(gym.ObservationWrapper):
 
 
 def make_offline_ant(env_name):
+    """Loads the D4RL AntMaze environments."""
     if env_name == 'offline_ant_umaze':
         env = gym.make('antmaze-umaze-v2')
     elif env_name == 'offline_ant_umaze_diverse':

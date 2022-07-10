@@ -1040,6 +1040,7 @@ def distributed_shampoo(
         count=jnp.zeros([], jnp.int32),
         stats=ShardedShampooStats(global_stats, local_stats))
 
+
   def _max_statistics_size_from_params(params):
     max_size = 0
     for param in params:
@@ -1425,7 +1426,10 @@ def distributed_shampoo(
     Returns:
       New optimizer states after computing the preconditioner.
     """
-    num_devices = lax.psum(1, batch_axis_name)
+    if batch_axis_name:
+      num_devices = lax.psum(1, batch_axis_name)
+    else:
+      num_devices = 1
     num_statistics = len(statistics)
     # Pad statistics and exponents to next multiple of num_devices.
     packed_statistics = [
@@ -1445,13 +1449,20 @@ def distributed_shampoo(
     all_exponents = batch(exponents, num_devices)
 
     def _internal_inverse_pth_root_all():
-      current_replica = lax.axis_index(batch_axis_name)
-      preconditioners, errors = _matrix_inverse_pth_root_vmap(
-          all_statistics[current_replica], all_exponents[current_replica])
-      preconditioners = jax.lax.all_gather(preconditioners, batch_axis_name)
-      errors = jax.lax.all_gather(errors, batch_axis_name)
-      preconditioners_flat = unbatch(preconditioners)
-      errors_flat = unbatch(errors)
+      if batch_axis_name:
+        current_replica = lax.axis_index(batch_axis_name)
+        preconditioners, errors = _matrix_inverse_pth_root_vmap(
+            all_statistics[current_replica], all_exponents[current_replica])
+        preconditioners = jax.lax.all_gather(preconditioners, batch_axis_name)
+        errors = jax.lax.all_gather(errors, batch_axis_name)
+        preconditioners_flat = unbatch(preconditioners)
+        errors_flat = unbatch(errors)
+      else:
+        preconditioners, errors = _matrix_inverse_pth_root_vmap(
+            all_statistics[0], all_exponents[0])
+        preconditioners_flat = unbatch(jnp.stack([preconditioners]))
+        errors_flat = unbatch(jnp.stack([errors]))
+
       return preconditioners_flat, errors_flat
 
     if preconditioning_compute_steps == 1:
@@ -1862,7 +1873,7 @@ def distributed_shampoo(
         prev_preconditioners.extend(state.preconditioners)
         original_shapes.extend(original_shapes_for_state)
 
-    if batch_axis_name:
+    if not shard_optimizer_states:
       # Quantization is only enabled if batch_axis_name is not set.
       quantized_dtype = quantized_dtype_for_second_moment_statistics_buffers()
 
@@ -2025,13 +2036,7 @@ def distributed_shampoo(
   if shard_optimizer_states:
     # Hijacks the init_fn signature so we can return an OptState with
     # appropriate init_fns.
-    def _init_fns(unused_params):
-      return InitFnState(
-          init_fn=sharded_init_fn,
-          pspec_fn=sharded_init_partition_spec_fn,
-          shape_and_dtype_fn=sharded_init_shape_and_dtype_fn)
-
-    opt_update_fn = sharded_update_fn
+    opt_init_fn = sharded_init_fn
     return optax.GradientTransformation(_init_fns, opt_update_fn)
   else:
     return optax.GradientTransformation(init_fn, update_fn)

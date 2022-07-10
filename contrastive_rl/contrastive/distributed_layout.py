@@ -1,5 +1,5 @@
-# python3
-# Copyright 2018 DeepMind Technologies Limited. All rights reserved.
+# coding=utf-8
+# Copyright 2022 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,11 +32,11 @@ from acme.utils import loggers
 from acme.utils import lp_utils
 from acme.utils import observers as observers_lib
 import dm_env
-import tqdm
-import numpy as np
 import jax
 import launchpad as lp
+import numpy as np
 import reverb
+import tqdm
 
 ActorId = int
 AgentNetwork = Any
@@ -194,7 +194,8 @@ class DistributedLayout:
     ):
         """The Learning part of the agent."""
 
-        if self._builder._config.env_name.startswith('offline_ant'):  # pytype: disable=attribute-error
+        if self._builder._config.env_name.startswith(
+                'offline_ant'):  # pytype: disable=attribute-error, pylint: disable=protected-access
             adder = self._builder.make_adder(replay)
             env = self._environment_factory(0)
             dataset = env.get_dataset()  # pytype: disable=attribute-error
@@ -202,7 +203,6 @@ class DistributedLayout:
                 discount = 1.0
                 if t == 0 or dataset['timeouts'][t - 1]:
                     step_type = dm_env.StepType.FIRST
-                    # traj_id = np.random.randint(100)  # DELETEME (chongyiz): not used
                 elif dataset['timeouts'][t]:
                     step_type = dm_env.StepType.LAST
                     discount = 0.0
@@ -213,14 +213,15 @@ class DistributedLayout:
                     step_type=step_type,
                     reward=dataset['rewards'][t],
                     discount=discount,
-                    observation=np.concatenate([dataset['observations'][t], dataset['infos/goal'][t]]),
+                    observation=np.concatenate([dataset['observations'][t],
+                                                dataset['infos/goal'][t]]),
                 )
                 if t == 0 or dataset['timeouts'][t - 1]:
                     adder.add_first(ts)  # pytype: disable=attribute-error
                 else:
                     adder.add(action=dataset['actions'][t - 1], next_timestep=ts)  # pytype: disable=attribute-error
 
-                if self._builder._config.local and t > 10_000:  # pytype: disable=attribute-error
+                if self._builder._config.local and t > 10_000:  # pytype: disable=attribute-error, pylint: disable=protected-access
                     break
 
         iterator = self._builder.make_dataset_iterator(replay)
