@@ -28,6 +28,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --gin_bindings="c_learning_agent.critic_loss.sarsa_q=True" \
     --gin_bindings="c_learning_agent.critic_loss.sampled_next_action=True" \
+    --gin_bindings="c_learning_agent.actor_loss.log_ratio_future_goal=True" \
     --gin_bindings="c_learning_agent.actor_loss.log_ratio_loss=True" \
     --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \
     --gin_bindings="c_learning_agent.actor_loss.bc_lambda=0.25" \

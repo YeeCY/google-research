@@ -24,9 +24,8 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="train_eval_offline.max_future_steps=350" \
     --gin_bindings="obs_to_goal.start_index=(0,)" \
     --gin_bindings="obs_to_goal.end_index=(2,)" \
-    --gin_bindings="goal_fn.relabel_next_prob=0.0" \
-    --gin_bindings="goal_fn.relabel_future_prob=0.5" \
-    --gin_bindings="c_learning_agent.critic_loss.mc_q=True" \
+    --gin_bindings="goal_fn.relabel_next_prob=0.5" \
+    --gin_bindings="goal_fn.relabel_future_prob=0.0" \
     --gin_bindings="c_learning_agent.actor_loss.log_ratio_loss=True" \
     --gin_bindings="c_learning_agent.actor_loss.log_ratio_future_goal=True" \
     --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \

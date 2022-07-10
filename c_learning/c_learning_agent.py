@@ -763,6 +763,7 @@ class CLearningAgent(tf_agent.TFAgent):
                    actions,
                    weights=None,
                    log_ratio_loss=False,
+                   log_ratio_future_goal=False,
                    mse_bc_loss=False,
                    mle_bc_loss=False,
                    bc_lambda=0.25,
@@ -788,13 +789,27 @@ class CLearningAgent(tf_agent.TFAgent):
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
             # try future goal for both setting b and c
-            sampled_actions, sampled_log_pi, sampled_entropy = \
-                self._actions_log_probs_and_entropy(time_steps)
+            if log_ratio_future_goal:
+                sampled_actions, sampled_log_pi, sampled_entropy = \
+                    self._actions_log_probs_and_entropy(time_steps, future_goal=True)
+            else:
+                sampled_actions, sampled_log_pi, sampled_entropy = \
+                    self._actions_log_probs_and_entropy(time_steps)
 
-            sampled_target_input = (
-                time_steps.observation[:, :self._obs_dim + self._goal_dim],
-                sampled_actions
-            )
+            if log_ratio_future_goal:
+                sampled_target_input = (
+                    tf.concat([
+                        time_steps.observation[:, :self._obs_dim],
+                        time_steps.observation[
+                        :, self._obs_dim + 3 * self._goal_dim:self._obs_dim + 4 * self._goal_dim]
+                    ], axis=-1),
+                    sampled_actions
+                )
+            else:
+                sampled_target_input = (
+                    time_steps.observation[:, :self._obs_dim + self._goal_dim],
+                    sampled_actions
+                )
             sampled_q_values1, _ = self._critic_network_1(
                 sampled_target_input, time_steps.step_type, training=False)
             sampled_q_values2, _ = self._critic_network_2(
