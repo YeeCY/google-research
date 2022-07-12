@@ -542,6 +542,8 @@ class CLearningAgent(tf_agent.TFAgent):
                     sarsa_q=False,
                     sampled_next_action=False,
                     mc_q=False,
+                    negative_action_sampling=False,
+                    negative_action_sampling_future_goal=False,
                     ):
         """Computes the critic loss for C-learning training.
 
@@ -653,10 +655,39 @@ class CLearningAgent(tf_agent.TFAgent):
             pred_td_targets2, _ = self._critic_network_2(
                 pred_input, time_steps.step_type, training=training)
 
+            if negative_action_sampling:
+                neg_actions, _, _ = self._actions_log_probs_and_entropy(
+                    time_steps, future_goal=negative_action_sampling_future_goal)
+                if negative_action_sampling_future_goal:
+                    neg_observation = tf.concat([
+                        time_steps.observation[:, :self._obs_dim],
+                        time_steps.observation[
+                        :, self._obs_dim + 3 * self._goal_dim:self._obs_dim + 4 * self._goal_dim]
+                    ], axis=-1)
+                else:
+                    neg_observation = time_steps.observation[:, :self._obs_dim + self._goal_dim]
+                neg_pred_input = (neg_observation, neg_actions)
+                neg_pred_td_targets1, _ = self._critic_network_1(
+                    neg_pred_input, time_steps.step_type, training=training)
+                neg_pred_td_targets2, _ = self._critic_network_2(
+                    neg_pred_input, time_steps.step_type, training=training)
+
             # TODO (chongyiz): try original C-learning critic loss again
             # (chongyiz): cross-entropy implementation of the classifier loss
-            ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
-            ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
+            if negative_action_sampling:
+                assert mc_q
+                assert rfp == 0.5
+                ce_critic_loss1 = tf.concat([
+                    td_errors_loss_fn(td_targets[:half_batch], pred_td_targets1[:half_batch]),
+                    td_errors_loss_fn(td_targets[half_batch:], neg_pred_td_targets1[half_batch:])
+                ], axis=0)
+                ce_critic_loss2 = tf.concat([
+                    td_errors_loss_fn(td_targets[:half_batch], pred_td_targets2[:half_batch]),
+                    td_errors_loss_fn(td_targets[:half_batch], neg_pred_td_targets2[half_batch:])
+                ], axis=0)
+            else:
+                ce_critic_loss1 = td_errors_loss_fn(td_targets, pred_td_targets1)
+                ce_critic_loss2 = td_errors_loss_fn(td_targets, pred_td_targets2)
             critic_loss = ce_critic_loss1 + ce_critic_loss2
 
             # # (chongyiz): three term implementation of the classifier loss,
@@ -762,6 +793,7 @@ class CLearningAgent(tf_agent.TFAgent):
                    time_steps,
                    actions,
                    weights=None,
+                   use_target_critic=False,
                    log_ratio_loss=False,
                    log_ratio_future_goal=False,
                    mse_bc_loss=False,
@@ -810,11 +842,18 @@ class CLearningAgent(tf_agent.TFAgent):
                     time_steps.observation[:, :self._obs_dim + self._goal_dim],
                     sampled_actions
                 )
-            sampled_q_values1, _ = self._critic_network_1(
-                sampled_target_input, time_steps.step_type, training=False)
-            sampled_q_values2, _ = self._critic_network_2(
-                sampled_target_input, time_steps.step_type, training=False)
-            sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
+            if use_target_critic:
+                sampled_q_values1, _ = self._target_critic_network_1(
+                    sampled_target_input, time_steps.step_type, training=False)
+                sampled_q_values2, _ = self._target_critic_network_2(
+                    sampled_target_input, time_steps.step_type, training=False)
+                sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
+            else:
+                sampled_q_values1, _ = self._critic_network_1(
+                    sampled_target_input, time_steps.step_type, training=False)
+                sampled_q_values2, _ = self._critic_network_2(
+                    sampled_target_input, time_steps.step_type, training=False)
+                sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
             if log_ratio_loss:
                 # actor_loss = tf.keras.losses.binary_crossentropy(
                 #     tf.ones_like(sampled_q_values), sampled_q_values)
@@ -859,11 +898,18 @@ class CLearningAgent(tf_agent.TFAgent):
                     time_steps.observation[:, :self._obs_dim + self._goal_dim],
                     actions
                 )
-                q_values1, _ = self._critic_network_1(
-                    target_input, time_steps.step_type, training=False)
-                q_values2, _ = self._critic_network_2(
-                    target_input, time_steps.step_type, training=False)
-                q_values = tf.minimum(q_values1, q_values2)
+                if use_target_critic:
+                    q_values1, _ = self._target_critic_network_1(
+                        target_input, time_steps.step_type, training=False)
+                    q_values2, _ = self._target_critic_network_2(
+                        target_input, time_steps.step_type, training=False)
+                    q_values = tf.minimum(q_values1, q_values2)
+                else:
+                    q_values1, _ = self._critic_network_1(
+                        target_input, time_steps.step_type, training=False)
+                    q_values2, _ = self._critic_network_2(
+                        target_input, time_steps.step_type, training=False)
+                    q_values = tf.minimum(q_values1, q_values2)
 
                 actor_loss = -tf.reduce_mean(
                     log_pi *
