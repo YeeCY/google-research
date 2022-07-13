@@ -69,8 +69,11 @@ class CLearningAgent(tf_agent.TFAgent):
                  critic_network_2=None,
                  target_critic_network=None,
                  target_critic_network_2=None,
+                 history_critic_network=None,
+                 history_critic_network2=None,
                  target_update_tau=1.0,
                  target_update_period=1,
+                 history_update_period=10,
                  td_errors_loss_fn=tf.math.squared_difference,
                  gamma=1.0,
                  gradient_clipping=None,
@@ -148,6 +151,10 @@ class CLearningAgent(tf_agent.TFAgent):
             common.maybe_copy_target_network_with_checks(self._critic_network_1,
                                                          target_critic_network,
                                                          'TargetCriticNetwork1'))
+        self._history_critic_network_1 = (
+            common.maybe_copy_target_network_with_checks(self._critic_network_1,
+                                                         history_critic_network,
+                                                         'HistoryCriticNetwork'))
 
         if critic_network_2 is not None:
             self._critic_network_2 = critic_network_2
@@ -162,6 +169,10 @@ class CLearningAgent(tf_agent.TFAgent):
             common.maybe_copy_target_network_with_checks(self._critic_network_2,
                                                          target_critic_network_2,
                                                          'TargetCriticNetwork2'))
+        self._history_critic_network_2 = (
+            common.maybe_copy_target_network_with_checks(self._critic_network_2,
+                                                         history_critic_network2,
+                                                         'HistoryCriticNetwork2'))
 
         if actor_network:
             actor_network.create_variables()
@@ -179,8 +190,24 @@ class CLearningAgent(tf_agent.TFAgent):
             actor_network=self._actor_network,
             training=True)
 
+        # DELEME (chongyiz)
+        # self._target_actor_network = (
+        #     common.maybe_copy_target_network_with_checks(self._actor_network,
+        #                                                  target_actor_network,
+        #                                                  'TargetActorNetwork'))
+        # self._target_train = (
+        #     common.maybe_copy_target_network_with_checks(self._critic_network_2,
+        #                                                  target_critic_network_2,
+        #                                                  'TargetCriticNetwork2'))
+        # self._target_train_policy = actor_policy_ctor(
+        #     time_step_spec=time_step_spec,
+        #     action_spec=action_spec,
+        #     actor_network=self._target_actor_network,
+        #     training=False)  # check this
+
         self._target_update_tau = target_update_tau
         self._target_update_period = target_update_period
+        self._history_update_period = history_update_period
         self._actor_optimizer = actor_optimizer
         self._critic_optimizer = critic_optimizer
         self._behavioral_cloning_optimizer = behavioral_cloning_optimizer
@@ -200,8 +227,9 @@ class CLearningAgent(tf_agent.TFAgent):
         self._gradient_clipping = gradient_clipping
         self._debug_summaries = debug_summaries
         self._summarize_grads_and_vars = summarize_grads_and_vars
-        self._update_target = self._get_target_updater(
-            tau=self._target_update_tau, period=self._target_update_period)
+        self._update_target, self._update_history = self._get_target_and_history_updater(
+            tau=self._target_update_tau, target_update_period=self._target_update_period,
+            history_update_period=self._history_update_period)
 
         train_sequence_length = 2 if not critic_network.state_spec else None
 
@@ -327,6 +355,7 @@ class CLearningAgent(tf_agent.TFAgent):
 
         self.train_step_counter.assign_add(1)
         self._update_target()
+        self._update_history()
 
         total_loss = critic_loss + actor_loss
 
@@ -350,7 +379,10 @@ class CLearningAgent(tf_agent.TFAgent):
 
         optimizer.apply_gradients(grads_and_vars)
 
-    def _get_target_updater(self, tau=1.0, period=1):
+    def _get_target_and_history_updater(self,
+                                        tau=1.0,
+                                        target_update_period=1,
+                                        history_update_period=10):
         """Performs a soft update of the target network parameters.
 
         For each weight w_s in the original network, and its corresponding
@@ -365,7 +397,7 @@ class CLearningAgent(tf_agent.TFAgent):
           A callable that performs a soft update of the target network parameters.
         """
         with tf.name_scope('update_target'):
-            def update():
+            def update_targets():
                 """Update target network."""
                 critic_update_1 = common.soft_variables_update(
                     self._critic_network_1.variables,
@@ -387,7 +419,31 @@ class CLearningAgent(tf_agent.TFAgent):
 
                 return tf.group(critic_update_1, critic_update_2)
 
-            return common.Periodically(update, period, 'update_targets')
+        with tf.name_scope('update_history'):
+            def update_histories():
+                """Update history network."""
+                critic_update_1 = common.soft_variables_update(
+                    self._critic_network_1.variables,
+                    self._history_critic_network_1.variables,
+                    1.0,
+                    tau_non_trainable=1.0)
+
+                critic_2_update_vars = common.deduped_network_variables(
+                    self._critic_network_2, self._critic_network_1)
+
+                history_critic_2_update_vars = common.deduped_network_variables(
+                    self._history_critic_network_2, self._history_critic_network_1)
+
+                critic_update_2 = common.soft_variables_update(
+                    critic_2_update_vars,
+                    history_critic_2_update_vars,
+                    1.0,
+                    tau_non_trainable=1.0)
+
+                return tf.group(critic_update_1, critic_update_2)
+
+        return common.Periodically(update_targets, target_update_period, 'update_targets'), \
+               common.Periodically(update_histories, history_update_period, 'update_histories')
 
     def _actions_log_probs_and_entropy(self, time_steps, future_goal=False):
         """Get actions and corresponding log probabilities from policy."""
@@ -794,8 +850,9 @@ class CLearningAgent(tf_agent.TFAgent):
                    actions,
                    weights=None,
                    use_target_critic=False,
+                   use_history_critic=False,
                    log_ratio_loss=False,
-                   log_ratio_future_goal=False,
+                   future_goal=False,
                    mse_bc_loss=False,
                    mle_bc_loss=False,
                    bc_lambda=0.25,
@@ -821,14 +878,11 @@ class CLearningAgent(tf_agent.TFAgent):
             # nest_utils.assert_same_structure(time_steps, self.time_step_spec)
 
             # try future goal for both setting b and c
-            if log_ratio_future_goal:
-                sampled_actions, sampled_log_pi, sampled_entropy = \
-                    self._actions_log_probs_and_entropy(time_steps, future_goal=True)
-            else:
-                sampled_actions, sampled_log_pi, sampled_entropy = \
-                    self._actions_log_probs_and_entropy(time_steps)
+            sampled_actions, sampled_log_pi, sampled_entropy = \
+                self._actions_log_probs_and_entropy(
+                    time_steps, future_goal=future_goal)
 
-            if log_ratio_future_goal:
+            if future_goal:
                 sampled_target_input = (
                     tf.concat([
                         time_steps.observation[:, :self._obs_dim],
@@ -846,6 +900,12 @@ class CLearningAgent(tf_agent.TFAgent):
                 sampled_q_values1, _ = self._target_critic_network_1(
                     sampled_target_input, time_steps.step_type, training=False)
                 sampled_q_values2, _ = self._target_critic_network_2(
+                    sampled_target_input, time_steps.step_type, training=False)
+                sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
+            elif use_history_critic:
+                sampled_q_values1, _ = self._history_critic_network_1(
+                    sampled_target_input, time_steps.step_type, training=False)
+                sampled_q_values2, _ = self._history_critic_network_2(
                     sampled_target_input, time_steps.step_type, training=False)
                 sampled_q_values = tf.minimum(sampled_q_values1, sampled_q_values2)
             else:
@@ -868,8 +928,8 @@ class CLearningAgent(tf_agent.TFAgent):
                                  tf.zeros_like(sampled_q_values), sampled_q_values)
                 actor_loss = log_ratio_loss_val
             else:
-                ratio_loss = -1.0 * sampled_q_values
-                actor_loss = ratio_loss
+                q_loss_val = -1.0 * sampled_q_values
+                actor_loss = q_loss_val
 
             if mse_bc_loss:
                 mse_bc_loss_val = bc_lambda * tf.losses.mse(actions, sampled_actions)
@@ -938,6 +998,11 @@ class CLearningAgent(tf_agent.TFAgent):
                 tf.compat.v2.summary.scalar(
                     name='log_ratio_loss',
                     data=log_ratio_loss_val,
+                    step=self.train_step_counter)
+            else:
+                tf.compat.v2.summary.scalar(
+                    name='q_loss',
+                    data=q_loss_val,
                     step=self.train_step_counter)
             if mse_bc_loss:
                 tf.compat.v2.summary.scalar(
