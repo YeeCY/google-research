@@ -90,6 +90,7 @@ def train_eval_offline(
         # Params for target update
         target_update_tau=0.005,
         target_update_period=1,
+        history_update_period=20,
         # Params for train
         train_steps_per_iteration=1,
         batch_size=256,
@@ -190,6 +191,7 @@ def train_eval_offline(
                 obs_dim=obs_dim,
                 target_update_tau=target_update_tau,
                 target_update_period=target_update_period,
+                history_update_period=history_update_period,
                 td_errors_loss_fn=bce_loss,
                 gamma=gamma,
                 gradient_clipping=gradient_clipping,

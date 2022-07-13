@@ -29,8 +29,7 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="c_learning_agent.critic_loss.mc_q=True" \
     --gin_bindings="c_learning_agent.critic_loss.negative_action_sampling=True" \
     --gin_bindings="c_learning_agent.critic_loss.negative_action_sampling_future_goal=True" \
-    --gin_bindings="c_learning_agent.actor_loss.log_ratio_loss=True" \
-    --gin_bindings="c_learning_agent.actor_loss.log_ratio_future_goal=True" \
+    --gin_bindings="c_learning_agent.actor_loss.future_goal=True" \
     --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \
     --gin_bindings="c_learning_agent.actor_loss.bc_lambda=0.25" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_medium_play_v2/$seed \

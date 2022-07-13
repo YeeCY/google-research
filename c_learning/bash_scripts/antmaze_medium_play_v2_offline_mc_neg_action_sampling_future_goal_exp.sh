@@ -24,13 +24,12 @@ for seed in "${seeds[@]}"; do
     --gin_bindings="train_eval_offline.max_future_steps=350" \
     --gin_bindings="obs_to_goal.start_index=(0,)" \
     --gin_bindings="obs_to_goal.end_index=(2,)" \
-    --gin_bindings="goal_fn.relabel_next_prob=0.5" \
-    --gin_bindings="goal_fn.relabel_future_prob=0.0" \
-    --gin_bindings="c_learning_agent.critic_loss.sarsa_q=True" \
+    --gin_bindings="goal_fn.relabel_next_prob=0.0" \
+    --gin_bindings="goal_fn.relabel_future_prob=0.5" \
+    --gin_bindings="c_learning_agent.critic_loss.mc_q=True" \
+    --gin_bindings="c_learning_agent.critic_loss.negative_action_sampling=True" \
+    --gin_bindings="c_learning_agent.critic_loss.negative_action_sampling_future_goal=True" \
     --gin_bindings="c_learning_agent.actor_loss.future_goal=True" \
-    --gin_bindings="c_learning_agent.actor_loss.use_target_critic=True" \
-    --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \
-    --gin_bindings="c_learning_agent.actor_loss.bc_lambda=0.25" \
     --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_medium_play_v2/$seed \
   > ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_medium_play_v2/$seed/stream.log 2>&1 & \
   sleep 5

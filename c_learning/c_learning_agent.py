@@ -73,7 +73,7 @@ class CLearningAgent(tf_agent.TFAgent):
                  history_critic_network2=None,
                  target_update_tau=1.0,
                  target_update_period=1,
-                 history_update_period=10,
+                 history_update_period=20,
                  td_errors_loss_fn=tf.math.squared_difference,
                  gamma=1.0,
                  gradient_clipping=None,
@@ -382,7 +382,7 @@ class CLearningAgent(tf_agent.TFAgent):
     def _get_target_and_history_updater(self,
                                         tau=1.0,
                                         target_update_period=1,
-                                        history_update_period=10):
+                                        history_update_period=20):
         """Performs a soft update of the target network parameters.
 
         For each weight w_s in the original network, and its corresponding
@@ -928,7 +928,7 @@ class CLearningAgent(tf_agent.TFAgent):
                                  tf.zeros_like(sampled_q_values), sampled_q_values)
                 actor_loss = log_ratio_loss_val
             else:
-                q_loss_val = -1.0 * sampled_q_values
+                q_loss_val = tf.reduce_mean(-1.0 * sampled_q_values)
                 actor_loss = q_loss_val
 
             if mse_bc_loss:
