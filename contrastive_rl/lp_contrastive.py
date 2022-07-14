@@ -128,7 +128,7 @@ def main(_):
         'use_random_actor': True,
         'entropy_coefficient': None if 'image' in env_name else 0.0,
         'env_name': env_name,
-        'max_number_of_steps': 1_000_000,
+        'max_number_of_steps': 15625,  # default = 1_000_000, 15625 for 1M gradient steps in total
         'use_image_obs': 'image' in env_name,
     }
     if 'ant_' in env_name:
