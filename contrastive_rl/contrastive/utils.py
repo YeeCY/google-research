@@ -15,8 +15,10 @@
 
 """Utilities for the contrastive RL agent."""
 import functools
+import logging
 from typing import Dict
 from typing import Optional, Sequence
+from typing import Any, Callable, Mapping
 
 from acme import types
 from acme.agents.jax import actors
@@ -27,6 +29,12 @@ from acme.wrappers import base
 from acme.wrappers import canonical_spec
 from acme.wrappers import gym_wrapper
 from acme.wrappers import step_limit
+from acme.utils.loggers import aggregators
+from acme.utils.loggers import asynchronous as async_logger
+from acme.utils.loggers import base as logger_base
+from acme.utils.loggers import csv
+from acme.utils.loggers import filters
+from acme.utils.loggers import terminal
 import dm_env
 import env_utils
 import jax
@@ -72,7 +80,7 @@ class SuccessObserver(observers_base.EnvLoopObserver):
         """Returns metrics collected for the current episode."""
         return {
             'success': float(np.sum(self._rewards) >= 1),
-            'success_1000': np.mean(self._success[-1000:]),
+            'success_1000': np.nan_to_num(np.mean(self._success[-1000:])),
         }
 
 
@@ -127,9 +135,12 @@ class DistanceObserver(observers_base.EnvLoopObserver):
         """Returns metrics collected for the current episode."""
         metrics = self._get_current_metrics()
         if self._smooth:
-            for key, vec in self._history.items():
+            history_metrics = {}
+            for key in list(metrics.keys()):
+                vec = self._history.get(key, [0.0])
                 for size in [10, 100, 1000]:
-                    metrics['%s_%d' % (key, size)] = np.nanmean(vec[-size:])
+                    history_metrics['%s_%d' % (key, size)] = np.nanmean(vec[-size:])
+            metrics.update(history_metrics)
         return metrics
 
 
@@ -202,6 +213,55 @@ def make_environment(env_name: str, start_index: int, end_index: int,
     if env_name.startswith('ant_'):
         env = canonical_spec.CanonicalSpecWrapper(env)
     return env, obs_dim
+
+
+def make_logger(
+        label: str,
+        save_data: bool = True,
+        time_delta: float = 1.0,
+        asynchronous: bool = False,
+        print_fn: Optional[Callable[[str], None]] = None,
+        serialize_fn: Optional[Callable[[Mapping[str, Any]], str]] = logger_base.to_numpy,
+        steps_key: str = 'steps',
+        log_dir: str = '~/acme',
+        log_dir_add_uid: bool = False,
+) -> logger_base.Logger:
+    """Makes a default Acme logger.
+
+    Args:
+      label: Name to give to the logger.
+      save_data: Whether to persist data.
+      time_delta: Time (in seconds) between logging events.
+      asynchronous: Whether the write function should block or not.
+      print_fn: How to print to terminal (defaults to print).
+      serialize_fn: An optional function to apply to the write inputs before
+        passing them to the various loggers.
+      steps_key: Ignored.
+
+    Returns:
+      A logger object that responds to logger.write(some_dict).
+    """
+    del steps_key
+    if not print_fn:
+        print_fn = logging.info
+    terminal_logger = terminal.TerminalLogger(label=label, print_fn=print_fn)
+
+    loggers = [terminal_logger]
+
+    if save_data:
+        loggers.append(csv.CSVLogger(
+            directory_or_file=log_dir,
+            label=label,
+            add_uid=log_dir_add_uid))
+
+    # Dispatch to all writers and filter Nones and by time.
+    logger = aggregators.Dispatcher(loggers, serialize_fn)
+    logger = filters.NoneFilter(logger)
+    if asynchronous:
+        logger = async_logger.AsyncLogger(logger)
+    logger = filters.TimeFilter(logger, time_delta)
+
+    return logger
 
 
 class InitiallyRandomActor(actors.GenericActor):

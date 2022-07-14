@@ -37,8 +37,6 @@ FLAGS = flags.FLAGS
 flags.DEFINE_boolean('debug', False, 'Runs training for just a few steps.')
 flags.DEFINE_string('root_dir', '~/contrastive_rl_logs',
                     'Root directory for writing logs/summaries/checkpoints.')
-flags.DEFINE_boolean('root_dir_add_uid', False,
-                     'If True adds a UID to the log path.')
 flags.DEFINE_string('env_name', 'sawyer_window',
                     'Select an environment')
 flags.DEFINE_string('alg', 'contrastive_nce',
@@ -98,7 +96,8 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
         config=config,
         num_actors=config.num_actors,
         log_to_bigtable=True,
-        max_number_of_steps=config.max_number_of_steps)
+        max_number_of_steps=config.max_number_of_steps,
+        root_dir=FLAGS.root_dir)
     return agent.build()
 
 

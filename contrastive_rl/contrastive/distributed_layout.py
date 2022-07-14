@@ -100,8 +100,11 @@ def default_evaluator_factory(
 
         # Create logger and counter.
         counter = counting.Counter(counter, 'evaluator')
-        logger = loggers.make_default_logger('evaluator', log_to_bigtable,
-                                             steps_key='actor_steps')
+        if logger_fn is not None:
+            logger = logger_fn('evaluator', 'actor_steps')
+        else:
+            logger = loggers.make_default_logger(
+                'evaluator', log_to_bigtable, steps_key='actor_steps')
 
         # Create the run loop and return it.
         return environment_loop.EnvironmentLoop(environment, actor, counter,

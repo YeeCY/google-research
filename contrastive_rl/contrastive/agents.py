@@ -20,7 +20,7 @@ from typing import Callable, Optional, Sequence
 
 from acme import specs
 from acme.jax import utils
-from acme.utils import loggers
+# from acme.utils import loggers
 from contrastive import builder
 from contrastive import config as contrastive_config
 from contrastive import distributed_layout
@@ -29,6 +29,7 @@ from contrastive import utils as contrastive_utils
 
 import dm_env
 
+ActorId = int
 NetworkFactory = Callable[[specs.EnvironmentSpec],
                           networks.ContrastiveNetworks]
 
@@ -48,18 +49,31 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
             log_every: float = 10.0,
             evaluator_factories: Optional[Sequence[
                 distributed_layout.EvaluatorFactory]] = None,
-            checkpointing_dir='~/contrastive_rl_logs',
-            checkpointing_add_uid=True,
+            root_dir: str ='~/contrastive_rl_logs',
+            log_dir_add_uid: bool = False,
+            checkpoint_dir_add_uid: bool = False,
     ):
         # Check that the environment-specific parts of the config have been set.
         assert config.max_episode_steps > 0
         assert config.obs_dim > 0
 
-        logger_fn = functools.partial(loggers.make_default_logger,
+        logger_fn = functools.partial(contrastive_utils.make_logger,
                                       'learner', log_to_bigtable,
                                       time_delta=log_every, asynchronous=True,
                                       serialize_fn=utils.fetch_devicearray,
-                                      steps_key='learner_steps')
+                                      steps_key='learner_steps',
+                                      log_dir=root_dir,
+                                      log_dir_add_uid=log_dir_add_uid)
+
+        def actor_logger_fn(actor_id: ActorId):
+            return contrastive_utils.make_logger(
+                'actor',
+                save_data=(log_to_bigtable and actor_id == 0),
+                time_delta=log_every,
+                steps_key='actor_steps',
+                log_dir=root_dir,
+                log_dir_add_uid=log_dir_add_uid)
+
         contrastive_builder = builder.ContrastiveBuilder(config,
                                                          logger_fn=logger_fn)
         if evaluator_factories is None:
@@ -74,14 +88,17 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
             ]
 
             def logger_fn(label, steps_key):
-                if config.load_rb:
-                    steps_key = 'learner_steps'
-                return loggers.make_default_logger(
+                # DELEME (chongyiz)
+                # if config.load_rb:
+                #     steps_key = 'learner_steps'
+                return contrastive_utils.make_logger(
                     label,
                     save_data=log_to_bigtable,
                     time_delta=log_every,
-                    asynchronous=True,
-                    steps_key=steps_key)
+                    # asynchronous=True,
+                    steps_key=steps_key,
+                    log_dir=root_dir,
+                    log_dir_add_uid=log_dir_add_uid)
 
             evaluator_factories = [
                 distributed_layout.default_evaluator_factory(
@@ -92,8 +109,8 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
                     observers=eval_observers,
                     logger_fn=logger_fn)
             ]
-            if config.local:
-                evaluator_factories = []
+            # if config.local:
+            #     evaluator_factories = []
         actor_observers = [
             contrastive_utils.SuccessObserver(),
             contrastive_utils.DistanceObserver(obs_dim=config.obs_dim,
@@ -110,9 +127,8 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
             max_number_of_steps=max_number_of_steps,
             prefetch_size=config.prefetch_size,
             log_to_bigtable=log_to_bigtable,
-            actor_logger_fn=distributed_layout.get_default_logger_fn(
-                log_to_bigtable, log_every),
+            actor_logger_fn=actor_logger_fn,
             observers=actor_observers,
             checkpointing_config=distributed_layout.CheckpointingConfig(
-                directory=checkpointing_dir, add_uid=checkpointing_add_uid),
+                directory=root_dir, add_uid=checkpoint_dir_add_uid),
             steps_key=config.steps_key)
