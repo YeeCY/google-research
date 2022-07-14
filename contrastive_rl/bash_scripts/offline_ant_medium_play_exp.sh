@@ -19,15 +19,15 @@ declare -a seeds=(0 1 2)
 for seed in "${seeds[@]}"; do
   export CUDA_VISIBLE_DEVICES=$seed
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
-  # TODO (chongyiz): add a line to remove the log folder if it exists
-  mkdir -p ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed
+  rm -p ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_medium_play/$seed
+  mkdir -p ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_medium_play/$seed
   nohup \
   python $PROJECT_DIR/lp_contrastive.py \
-    --env_name=offline_ant_umaze \
+    --env_name=offline_ant_medium_play \
     --alg=c_learning \
     --seed="$seed" \
     --lp_launch_type=local_mt \
-    --root_dir=~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed \
-  > ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed/stream.log 2>&1 & \
+    --root_dir=~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_medium_play/$seed \
+  > ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_medium_play/$seed/stream.log 2>&1 & \
   sleep 5
 done
