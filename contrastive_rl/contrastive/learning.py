@@ -337,8 +337,8 @@ class ContrastiveLearner(acme.Learner):
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
-        # (chongyiz): dummy get_counts() call to prevent field missing in the evaluator CSV log
-        # self._counter.get_counts()
+        # (chongyiz): dummy increment to prevent field missing in the evaluator CSV log
+        self._counter.increment(steps=0, walltime=0)
         self._logger = logger or loggers.make_default_logger(
             'learner', asynchronous=True, serialize_fn=utils.fetch_devicearray,
             time_delta=10.0)

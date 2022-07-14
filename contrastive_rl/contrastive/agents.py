@@ -95,7 +95,7 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
                     label,
                     save_data=log_to_bigtable,
                     time_delta=log_every,
-                    # asynchronous=True,
+                    asynchronous=True,
                     steps_key=steps_key,
                     log_dir=root_dir,
                     log_dir_add_uid=log_dir_add_uid)
@@ -109,8 +109,6 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
                     observers=eval_observers,
                     logger_fn=logger_fn)
             ]
-            # if config.local:
-            #     evaluator_factories = []
         actor_observers = [
             contrastive_utils.SuccessObserver(),
             contrastive_utils.DistanceObserver(obs_dim=config.obs_dim,

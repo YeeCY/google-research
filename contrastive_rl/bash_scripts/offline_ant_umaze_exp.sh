@@ -19,6 +19,7 @@ declare -a seeds=(0 1 2)
 for seed in "${seeds[@]}"; do
   export CUDA_VISIBLE_DEVICES=$seed
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
+  # TODO (chongyiz): add a line to remove the log folder if it exists
   mkdir -p ~/offline_c_learning/contrastive_rl_logs/"${EXP_LABEL}"/offline_ant_umaze/$seed
   nohup \
   python $PROJECT_DIR/lp_contrastive.py \
