@@ -22,7 +22,7 @@ for bc_lambda in "${all_bc_lambdas[@]}"; do
       --gin_bindings="train_eval_offline.agent='c_learning_agent'" \
       --gin_bindings="train_eval_offline.env_name='antmaze-medium-play-v2'" \
       --gin_bindings="train_eval_offline.random_seed=${seed}" \
-      --gin_bindings="train_eval_offline.num_iterations=2000000" \
+      --gin_bindings="train_eval_offline.num_iterations=1000000" \
       --gin_bindings="train_eval_offline.max_future_steps=350" \
       --gin_bindings="obs_to_goal.start_index=(0,)" \
       --gin_bindings="obs_to_goal.end_index=(2,)" \
@@ -30,7 +30,7 @@ for bc_lambda in "${all_bc_lambdas[@]}"; do
       --gin_bindings="goal_fn.relabel_future_prob=0.5" \
       --gin_bindings="c_learning_agent.critic_loss.mc_q=True" \
       --gin_bindings="c_learning_agent.actor_loss.log_ratio_loss=True" \
-      --gin_bindings="c_learning_agent.actor_loss.log_ratio_future_goal=True" \
+      --gin_bindings="c_learning_agent.actor_loss.future_goal=True" \
       --gin_bindings="c_learning_agent.actor_loss.mle_bc_loss=True" \
       --gin_bindings="c_learning_agent.actor_loss.bc_lambda=${bc_lambda}" \
       --root_dir ~/offline_c_learning/c_learning_offline_logs/"${EXP_LABEL}"/antmaze_medium_play_v2_bc_lambda="${bc_lambda}"/$seed \
