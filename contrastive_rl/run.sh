@@ -17,6 +17,7 @@
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco200/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia-000
+export XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1
 
 python lp_contrastive.py \
   --debug=True \
