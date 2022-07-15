@@ -248,13 +248,16 @@ class ContrastiveLearner(acme.Learner):
                 dist_params = networks.policy_network.apply(
                     policy_params, new_obs)
                 action = networks.sample(dist_params, key)
-                log_prob = networks.log_prob(dist_params, action)
+                sampled_log_prob = networks.log_prob(dist_params, action)
+                log_prob = networks.log_prob(dist_params, transitions.action)
                 q_action = networks.q_network.apply(
                     q_params, new_obs, action)
                 if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[2] == 2
                     q_action = jnp.min(q_action, axis=-1)
-                actor_loss = alpha * log_prob - jnp.diag(q_action)
+                actor_loss = (1 - config.bc_coef) * (
+                        alpha * sampled_log_prob - jnp.diag(q_action)) + \
+                             config.bc_coef * (-1 * jnp.mean(log_prob))
 
             return jnp.mean(actor_loss)
 
