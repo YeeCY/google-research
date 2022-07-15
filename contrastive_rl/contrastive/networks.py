@@ -32,6 +32,7 @@ class ContrastiveNetworks:
     """Network and pure functions for the Contrastive RL agent."""
     policy_network: networks_lib.FeedForwardNetwork
     q_network: networks_lib.FeedForwardNetwork
+    behavioral_cloning_policy_network: networks_lib.FeedForwardNetwork
     log_prob: networks_lib.LogProbFn
     repr_fn: Callable[..., networks_lib.NetworkOutput]
     sample: networks_lib.SampleFn
@@ -141,21 +142,41 @@ def make_networks(
         ])
         return network(obs)
 
+    def _behavioral_cloning_fn(state):
+        if use_image_obs:
+            state = TORSO()(state)
+        network = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes),
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                activate_final=True),
+            networks_lib.NormalTanhDistribution(num_dimensions,
+                                                min_scale=actor_min_std),
+        ])
+        return network(state)
+
     policy = hk.without_apply_rng(hk.transform(_actor_fn))
     critic = hk.without_apply_rng(hk.transform(_critic_fn))
+    behavioral_cloning_policy = hk.without_apply_rng(hk.transform(_behavioral_cloning_fn))
     repr_fn = hk.without_apply_rng(hk.transform(_repr_fn))
 
     # Create dummy observations and actions to create network parameters.
     dummy_action = utils.zeros_like(spec.actions)
     dummy_obs = utils.zeros_like(spec.observations)
+    dummy_state = utils.zeros_like(dummy_obs[:obs_dim])
     dummy_action = utils.add_batch_dim(dummy_action)
     dummy_obs = utils.add_batch_dim(dummy_obs)
+    dummy_state = utils.add_batch_dim(dummy_state)
 
     return ContrastiveNetworks(
         policy_network=networks_lib.FeedForwardNetwork(
             lambda key: policy.init(key, dummy_obs), policy.apply),
         q_network=networks_lib.FeedForwardNetwork(
             lambda key: critic.init(key, dummy_obs, dummy_action), critic.apply),
+        behavioral_cloning_policy_network=networks_lib.FeedForwardNetwork(
+            lambda key: behavioral_cloning_policy.init(key, dummy_state),
+            behavioral_cloning_policy.apply),
         repr_fn=repr_fn.apply,
         log_prob=lambda params, actions: params.log_prob(actions),
         sample=lambda params, key: params.sample(seed=key),

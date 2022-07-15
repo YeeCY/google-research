@@ -152,6 +152,10 @@ def main(_):
     elif alg == 'c_learning':
         params['use_td'] = True
         params['twin_q'] = True
+    elif alg == 'sarsa_c_learning':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['actual_next_action'] = True
     elif alg == 'nce+c_learning':
         params['use_td'] = True
         params['twin_q'] = True

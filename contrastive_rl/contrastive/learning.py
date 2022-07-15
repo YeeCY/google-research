@@ -35,9 +35,11 @@ class TrainingState(NamedTuple):
     """Contains training state for the learner."""
     policy_optimizer_state: optax.OptState
     q_optimizer_state: optax.OptState
+    behavioral_cloning_policy_optimizer_state: optax.OptState
     policy_params: networks_lib.Params
     q_params: networks_lib.Params
     target_q_params: networks_lib.Params
+    behavioral_cloning_policy_params: networks_lib.Params
     key: networks_lib.PRNGKey
     alpha_optimizer_state: Optional[optax.OptState] = None
     alpha_params: Optional[networks_lib.Params] = None
@@ -54,6 +56,7 @@ class ContrastiveLearner(acme.Learner):
             rng: jnp.ndarray,
             policy_optimizer: optax.GradientTransformation,
             q_optimizer: optax.GradientTransformation,
+            behavioral_cloning_policy_optimizer: optax.GradientTransformation,
             iterator: Iterator[reverb.ReplaySample],
             counter: counting.Counter,
             logger: loggers.Logger,
@@ -131,6 +134,12 @@ class ContrastiveLearner(acme.Learner):
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
             logits = networks.q_network.apply(
                 q_params, transitions.observation, transitions.action)
+            if config.negative_action_sampling:
+                dist_params = networks.policy_network.apply(
+                    policy_params, transitions.observation)
+                neg_action = networks.sample(dist_params, key)
+                neg_action_logits = networks.q_network.apply(
+                    q_params, transitions.observation, neg_action)
 
             if config.use_td:
                 # Make sure to use the twin Q trick.
@@ -144,9 +153,16 @@ class ContrastiveLearner(acme.Learner):
                 g = g[goal_indices]
                 transitions = transitions._replace(
                     next_observation=jnp.concatenate([next_s, g], axis=1))
-                next_dist_params = networks.policy_network.apply(
-                    policy_params, transitions.next_observation)
-                next_action = networks.sample(next_dist_params, key)
+                if config.actual_next_action:
+                    next_action = transitions.extras['next_action']
+                elif config.sampled_next_action:
+                    next_dist_params = networks.behavioral_cloning_policy_network.apply(
+                        policy_params, transitions.next_observation[:, :self._obs_dim])
+                    next_action = networks.sample(next_dist_params, key)
+                else:
+                    next_dist_params = networks.policy_network.apply(
+                        policy_params, transitions.next_observation)
+                    next_action = networks.sample(next_dist_params, key)
                 next_q = networks.q_network.apply(target_q_params,
                                                   transitions.next_observation,
                                                   next_action)  # This outputs logits.
@@ -192,8 +208,24 @@ class ContrastiveLearner(acme.Learner):
 
                 if len(logits.shape) == 3:  # twin q
                     # loss.shape = [.., num_q]
-                    loss = jax.vmap(loss_fn, in_axes=2, out_axes=-1)(logits)
-                    loss = jnp.mean(loss, axis=-1)
+                    if config.negative_action_sampling:
+                        pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
+                        pos_loss = optax.sigmoid_binary_cross_entropy(
+                            logits=pos_logits, labels=1)  # [B, 2]
+                        if config.negative_action_sampling_future_goals:
+                            neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_action_logits)
+                        else:
+                            rnd_goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
+                            neg_logits = neg_action_logits[jnp.arange(batch_size), rnd_goal_indices]
+                        neg_loss = optax.sigmoid_binary_cross_entropy(
+                            logits=neg_logits, labels=0)
+                        # TODO (chongyiz): Can we simply sum the pos_loss and neg_loss here?
+                        loss = jnp.stack(
+                            [jnp.mean(pos_loss, axis=-1), jnp.mean(neg_loss, axis=-1)],
+                            axis=-1)
+                    else:
+                        loss = jax.vmap(loss_fn, in_axes=2, out_axes=-1)(logits)
+                        loss = jnp.mean(loss, axis=-1)
                     # Take the mean here so that we can compute the accuracy.
                     logits = jnp.mean(logits, axis=-1)
                 else:
@@ -216,6 +248,18 @@ class ContrastiveLearner(acme.Learner):
             }
 
             return loss, metrics
+
+        def behavioral_cloning_loss(behavioral_cloning_policy_params: networks_lib.Params,
+                                    transitions: types.Transition,
+                                    key: networks_lib.PRNGKey):
+            del key
+            dist_params = networks.behavioral_cloning_policy_network.apply(
+                behavioral_cloning_policy_params,
+                transitions.observation[:, :self._obs_dim])
+            log_prob = networks.log_prob(dist_params, transitions.action)
+            bc_loss = -1.0 * jnp.mean(log_prob)
+
+            return bc_loss
 
         def actor_loss(policy_params: networks_lib.Params,
                        q_params: networks_lib.Params,
@@ -257,20 +301,23 @@ class ContrastiveLearner(acme.Learner):
                     q_action = jnp.min(q_action, axis=-1)
                 actor_loss = (1 - config.bc_coef) * (
                         alpha * sampled_log_prob - jnp.diag(q_action)) + \
-                             config.bc_coef * (-1 * jnp.mean(log_prob))
+                             config.bc_coef * (-1 * log_prob)
 
             return jnp.mean(actor_loss)
 
         alpha_grad = jax.value_and_grad(alpha_loss)
         critic_grad = jax.value_and_grad(critic_loss, has_aux=True)
         actor_grad = jax.value_and_grad(actor_loss)
+        behavioral_cloning_grad = jax.value_and_grad(behavioral_cloning_loss)
 
         def update_step(
                 state: TrainingState,
                 transitions: types.Transition,
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
 
-            key, key_alpha, key_critic, key_actor = jax.random.split(state.key, 4)
+            key, key_alpha, key_critic, key_actor, key_behavioral_cloning = \
+                jax.random.split(state.key, 5)
+            # key, key_alpha, key_critic, key_actor = jax.random.split(state.key, 4)
             if adaptive_entropy_coefficient:
                 alpha_loss, alpha_grads = alpha_grad(state.alpha_params,
                                                      state.policy_params, transitions,
@@ -286,6 +333,9 @@ class ContrastiveLearner(acme.Learner):
 
             actor_loss, actor_grads = actor_grad(state.policy_params, state.q_params,
                                                  alpha, transitions, key_actor)
+
+            behavioral_cloning_loss, behavioral_cloning_grads = behavioral_cloning_grad(
+                state.behavioral_cloning_policy_params, transitions, key_behavioral_cloning)
 
             # Apply policy gradients
             actor_update, policy_optimizer_state = policy_optimizer.update(
@@ -310,17 +360,29 @@ class ContrastiveLearner(acme.Learner):
                     state.target_q_params, q_params)
                 metrics = critic_metrics
 
+            # (chongyiz): Apply behavioral cloning gradients
+            behavioral_cloning_update, behavioral_cloning_policy_optimizer_state = \
+                behavioral_cloning_policy_optimizer.update(
+                    behavioral_cloning_grads,
+                    state.behavioral_cloning_policy_optimizer_state)
+            behavioral_cloning_policy_params = optax.apply_updates(
+                state.behavioral_cloning_policy_params,
+                behavioral_cloning_update)
+
             metrics.update({
                 'critic_loss': critic_loss,
                 'actor_loss': actor_loss,
+                'behavioral_cloning_loss': behavioral_cloning_loss,
             })
 
             new_state = TrainingState(
                 policy_optimizer_state=policy_optimizer_state,
                 q_optimizer_state=q_optimizer_state,
+                behavioral_cloning_policy_optimizer_state=behavioral_cloning_policy_optimizer_state,
                 policy_params=policy_params,
                 q_params=q_params,
                 target_q_params=new_target_q_params,
+                behavioral_cloning_policy_params=behavioral_cloning_policy_params,
                 key=key,
             )
             if adaptive_entropy_coefficient:
@@ -359,7 +421,7 @@ class ContrastiveLearner(acme.Learner):
 
         def make_initial_state(key: networks_lib.PRNGKey) -> TrainingState:
             """Initialises the training state (parameters and optimiser state)."""
-            key_policy, key_q, key = jax.random.split(key, 3)
+            key_policy, key_q, key_behavioral_cloning_policy, key = jax.random.split(key, 4)
 
             policy_params = networks.policy_network.init(key_policy)
             policy_optimizer_state = policy_optimizer.init(policy_params)
@@ -367,11 +429,20 @@ class ContrastiveLearner(acme.Learner):
             q_params = networks.q_network.init(key_q)
             q_optimizer_state = q_optimizer.init(q_params)
 
+            behavioral_cloning_policy_params = \
+                networks.behavioral_cloning_policy_network.init(
+                    key_behavioral_cloning_policy)
+            behavioral_cloning_policy_optimizer_state = \
+                behavioral_cloning_policy_optimizer.init(
+                    behavioral_cloning_policy_params)
+
             state = TrainingState(
                 policy_optimizer_state=policy_optimizer_state,
                 q_optimizer_state=q_optimizer_state,
+                behavioral_cloning_policy_optimizer_state=behavioral_cloning_policy_optimizer_state,
                 policy_params=policy_params,
                 q_params=q_params,
+                behavioral_cloning_policy_params=behavioral_cloning_policy_params,
                 target_q_params=q_params,
                 key=key)
 

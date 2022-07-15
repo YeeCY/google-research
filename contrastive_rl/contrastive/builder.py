@@ -70,11 +70,14 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
         policy_optimizer = optax.adam(
             learning_rate=self._config.actor_learning_rate, eps=1e-7)
         q_optimizer = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
+        behavioral_cloning_policy_optimizer = optax.adam(
+            learning_rate=self._config.actor_learning_rate, eps=1e-7)
         return learning.ContrastiveLearner(
             networks=networks,
             rng=random_key,
             policy_optimizer=policy_optimizer,
             q_optimizer=q_optimizer,
+            behavioral_cloning_policy_optimizer=behavioral_cloning_policy_optimizer,
             iterator=dataset,
             counter=counter,
             logger=self._logger_fn(),
