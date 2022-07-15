@@ -26,6 +26,7 @@ Run using multi-threading
 import functools
 from typing import Any, Dict
 import numpy as np
+import tensorflow as tf
 
 from absl import app
 from absl import flags
@@ -35,6 +36,7 @@ import launchpad as lp
 
 FLAGS = flags.FLAGS
 flags.DEFINE_boolean('debug', False, 'Runs training for just a few steps.')
+flags.DEFINE_bool('run_eagerly', False, 'Enables / disables eager execution of tf.functions.')
 flags.DEFINE_string('root_dir', '~/contrastive_rl_logs',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_string('env_name', 'sawyer_window',
@@ -102,6 +104,9 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
 
 
 def main(_):
+    if FLAGS.run_eagerly:
+        tf.config.run_functions_eagerly(True)  # be able to debug tensorflow functions
+
     # Create experiment description.
 
     # 1. Select an environment.
