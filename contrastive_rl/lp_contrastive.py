@@ -106,7 +106,10 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
 def main(_):
     if FLAGS.run_eagerly:
         tf.config.run_functions_eagerly(True)  # be able to debug tensorflow functions
-    tf.config.set_visible_devices([], "GPU")  # we don't need gpu for tensorflow dataset
+    # limit tensorflow gpu memory usage
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
 
     # Create experiment description.
 
