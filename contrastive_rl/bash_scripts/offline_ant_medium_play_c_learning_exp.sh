@@ -12,7 +12,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia-000
 export PYTHONPATH=$PROJECT_DIR
 export HDF5_USE_FILE_LOCKING=FALSE
 export XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1
-export XLA_PYTHON_CLIENT_MEM_FRACTION=.50
+#export XLA_PYTHON_CLIENT_MEM_FRACTION=.50
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 declare -a seeds=(0 1)
 
