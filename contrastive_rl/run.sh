@@ -13,4 +13,14 @@
 # limitations under the License.
 
 #!/bin/bash
-python lp_contrastive.py --debug=True
+
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco200/bin
+
+python lp_contrastive.py \
+  --debug=True \
+  --lp_launch_type=local_mt \
+  --root_dir=~/contrastive_rl_logs_debug/offline/ant_umaze_c_learning_debug/0 \
+  --env_name=offline_ant_umaze \
+  --alg=c_learning \
+  --seed=0
