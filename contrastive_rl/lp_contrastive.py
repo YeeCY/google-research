@@ -106,6 +106,7 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
 def main(_):
     if FLAGS.run_eagerly:
         tf.config.run_functions_eagerly(True)  # be able to debug tensorflow functions
+    tf.config.set_visible_devices([], "GPU")  # we don't need gpu for tensorflow dataset
 
     # Create experiment description.
 
@@ -147,6 +148,11 @@ def main(_):
     alg = FLAGS.alg
     if alg == 'contrastive_nce':
         pass  # Just use the default hyperparameters
+    elif alg == 'contrastive_nce_random_goal_neg_action_sampling':
+        params['negative_action_sampling'] = True
+    elif alg == 'contrastive_nce_future_goal_neg_action_sampling':
+        params['negative_action_sampling'] = True
+        params['negative_action_sampling_future_goals'] = True
     elif alg == 'contrastive_cpc':
         params['use_cpc'] = True
     elif alg == 'c_learning':
@@ -156,6 +162,10 @@ def main(_):
         params['use_td'] = True
         params['twin_q'] = True
         params['actual_next_action'] = True
+    elif alg == 'fitted_sarsa_c_learning':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['fitted_next_action'] = True
     elif alg == 'nce+c_learning':
         params['use_td'] = True
         params['twin_q'] = True

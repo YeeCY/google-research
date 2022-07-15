@@ -155,7 +155,7 @@ class ContrastiveLearner(acme.Learner):
                     next_observation=jnp.concatenate([next_s, g], axis=1))
                 if config.actual_next_action:
                     next_action = transitions.extras['next_action']
-                elif config.sampled_next_action:
+                elif config.fitted_next_action:
                     next_dist_params = networks.behavioral_cloning_policy_network.apply(
                         policy_params, transitions.next_observation[:, :self._obs_dim])
                     next_action = networks.sample(next_dist_params, key)

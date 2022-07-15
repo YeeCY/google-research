@@ -67,7 +67,7 @@ class ContrastiveConfig:
     negative_action_sampling: bool = False  # (chongyiz): MC with negative action sampling
     negative_action_sampling_future_goals: bool = False  # (chongyiz): negative action sampling with future goal
     actual_next_action: bool = False  # (chongyiz): SARSA Q estimation with actual next action
-    sampled_next_action: bool = False  # (chongyiz): SARSA Q estimation with sampled next action
+    fitted_next_action: bool = False  # (chongyiz): SARSA Q estimation with fitted next action
     twin_q: bool = False
     use_gcbc: bool = False
     use_image_obs: bool = False
