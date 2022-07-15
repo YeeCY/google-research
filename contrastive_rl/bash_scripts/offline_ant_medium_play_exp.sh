@@ -7,7 +7,7 @@ PROJECT_DIR=$(realpath "$SCRIPT_DIR/..")
 
 export PYTHONUNBUFFERED=1
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/data/chongyiz/.mujoco/mujoco200/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco200/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia-000
 export PYTHONPATH=$PROJECT_DIR
 export HDF5_USE_FILE_LOCKING=FALSE
