@@ -131,15 +131,6 @@ class OfflineAntWrapper(gym.ObservationWrapper):
     def max_episode_steps(self):
         return self.env.max_episode_steps
 
-    def step(self, action):
-        try:
-            obs, reward, done, info = super().step(action)
-        except mujoco_py.MujocoException as me:
-            obs = self.reset()
-            reward, done, info = 0, False, {}
-
-        return obs, reward, done, info
-
 
 def make_offline_ant(env_name):
     """Loads the D4RL AntMaze environments."""
