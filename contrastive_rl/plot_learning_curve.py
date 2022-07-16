@@ -56,16 +56,16 @@ def collect_data(root_exp_data_dir, stats, algos, env_name,
     for module_subdir, stats_field, stats_name in stats:
         stats_data = {}
         for algo, algo_dir in algos:
-            exp_dir = os.path.join(root_exp_data_dir, algo_dir, env_name)
-            # algo_data = []
-            seed_dirs = [os.path.join(exp_dir, exp_subdir)
-                         for exp_subdir in os.listdir(exp_dir)
-                         if re.search(r'^\d+$', exp_subdir)]
-
-            csv_paths = [os.path.join(seed_dir, 'logs', module_subdir, 'logs.csv')
-                         for seed_dir in seed_dirs]
-
             try:
+                exp_dir = os.path.join(root_exp_data_dir, algo_dir, env_name)
+                # algo_data = []
+                seed_dirs = [os.path.join(exp_dir, exp_subdir)
+                             for exp_subdir in os.listdir(exp_dir)
+                             if re.search(r'^\d+$', exp_subdir)]
+
+                csv_paths = [os.path.join(seed_dir, 'logs', module_subdir, 'logs.csv')
+                             for seed_dir in seed_dirs]
+
                 # df = pd.read_csv(csv_path)
                 algo_data = []
                 for idx, csv_path in enumerate(csv_paths):
@@ -83,7 +83,7 @@ def collect_data(root_exp_data_dir, stats, algos, env_name,
                 algo_data = np.asarray(algo_data).T
 
                 # df = pd.concat((pd.read_csv(f) for f in all_csv_paths), ignore_index=True)
-            except:
+            except FileNotFoundError:
                 print(f"CSV path not found: {csv_path}")
                 continue
 
@@ -118,20 +118,23 @@ def main(args):
     for algo_idx, (algo, _) in enumerate(args.algos):
         c = next(cycol)
         for stat_idx, (_, stats_field, stats_name) in enumerate(args.stats):
-            x = data[stats_field][algo][..., 0]
-            y = data[stats_field][algo][..., 1:]
+            try:
+                x = data[stats_field][algo][..., 0]
+                y = data[stats_field][algo][..., 1:]
 
-            # x, y = filter_outliers(x, y)
+                # x, y = filter_outliers(x, y)
 
-            mean = window_smooth(np.mean(y, axis=-1))
-            std = window_smooth(np.std(y, axis=-1))
+                mean = window_smooth(np.mean(y, axis=-1))
+                std = window_smooth(np.std(y, axis=-1))
 
-            axes[stat_idx].plot(x * 1e-6, mean, label=algo, color=c)
-            axes[stat_idx].fill_between(x * 1e-6, mean - 0.5 * std, mean + 0.5 * std,
-                                        facecolor=c, alpha=0.35)
-            axes[stat_idx].set_xlabel('Iterations (M)')
-            axes[stat_idx].set_ylabel(stats_name)
-            axes[stat_idx].legend(framealpha=0.)
+                axes[stat_idx].plot(x * 1e-6, mean, label=algo, color=c)
+                axes[stat_idx].fill_between(x * 1e-6, mean - 0.5 * std, mean + 0.5 * std,
+                                            facecolor=c, alpha=0.35)
+                axes[stat_idx].set_xlabel('Iterations (M)')
+                axes[stat_idx].set_ylabel(stats_name)
+                axes[stat_idx].legend(framealpha=0.)
+            except KeyError:
+                print("Algorithm {} data not found".format(algo))
 
     f_path = os.path.abspath(os.path.join(fig_save_dir, args.fig_filename + '.png'))
     f.suptitle(args.fig_title)
@@ -180,7 +183,10 @@ if __name__ == "__main__":
         # ('evaluator', 'episode_return', 'Episode Return'),
         ('learner', 'actor_loss', 'Actor Loss'),
         ('learner', 'critic_loss', 'Critic Loss'),
-        ('learner', 'behavioral_cloning_loss', '(Standalone) Behavioral Cloning Loss')
+        ('learner', 'behavioral_cloning_loss', '(Standalone) Behavioral Cloning Loss'),
+        ('learner', 'q_ratio', 'Q Ratio'),
+        ('learner', 'q_pos_ratio', 'Q Positive Ratio'),
+        ('learner', 'q_neg_ratio', 'Q Negative Ratio'),
     ])
     parser.add_argument('--timestep_field', type=str, default='learner_steps')
     parser.add_argument('--max_steps', type=int, default=np.iinfo(np.int64).max)
