@@ -178,8 +178,9 @@ class ContrastiveLearner(acme.Learner):
                 # So, the only thing that's meaningful for next_q is the diagonal. Off
                 # diagonal entries are meaningless and shouldn't be used.
                 w = next_v / (1 - next_v)
-                w_clipping = 20.0
-                w = jnp.clip(w, 0, w_clipping)
+                if not (config.actual_next_action or config.fitted_next_action):
+                    w_clipping = 20.0
+                    w = jnp.clip(w, 0, w_clipping)
                 # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
                 pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
                 loss_pos = optax.sigmoid_binary_cross_entropy(
@@ -237,6 +238,9 @@ class ContrastiveLearner(acme.Learner):
             correct = (jnp.argmax(logits, axis=1) == jnp.argmax(I, axis=1))
             logits_pos = jnp.sum(logits * I) / jnp.sum(I)
             logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
+            q_pos, q_neg = jax.nn.sigmoid(logits_pos), jax.nn.sigmoid(logits_neg)
+            q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), q_neg / (1 - q_neg)
+            q_ratio = jnp.mean([q_pos_ratio, q_neg_ratio])
             if len(logits.shape) == 3:
                 logsumexp = jax.nn.logsumexp(logits[:, :, 0], axis=1) ** 2
             else:
@@ -247,6 +251,9 @@ class ContrastiveLearner(acme.Learner):
                 'logits_pos': logits_pos,
                 'logits_neg': logits_neg,
                 'logsumexp': logsumexp.mean(),
+                'q_pos_ratio': q_pos_ratio,
+                'q_neg_ratio': q_neg_ratio,
+                'q_ratio': q_ratio,
             }
 
             return loss, metrics

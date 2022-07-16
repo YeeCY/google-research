@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--root_exp_data_dir', type=str, default='~/offline_c_learning/contrastive_rl_logs/offline')
-    parser.add_argument('--fig_title', type=str, default='Offline C-Learning Algorithm Learning Curves')
+    parser.add_argument('--fig_title', type=str, default='offline_ant_medium_play')
     parser.add_argument('--fig_save_dir', type=str,
                         default=os.path.join(os.path.dirname(__file__), 'figures'))
     parser.add_argument('--fig_filename', type=str,
@@ -172,9 +172,13 @@ if __name__ == "__main__":
     ])
     parser.add_argument('--env_name', type=str, default='offline_ant_medium_play')
     parser.add_argument('--stats', type=str_triplet, nargs='+', default=[
-        ('evaluator', 'success', 'Success Rate'),
+        ('evaluator', 'success', 'Success'),
         ('evaluator', 'success_1000', 'Success Rate 1000'),
-        ('evaluator', 'final_dist', 'Final Distance')
+        ('evaluator', 'final_dist', 'Final Distance'),
+        # ('evaluator', 'episode_return', 'Episode Return'),
+        ('learner', 'actor_loss', 'Actor Loss'),
+        ('learner', 'critic_loss', 'Critic Loss'),
+        ('learner', 'behavioral_cloning_loss', '(Standalone) Behavioral Cloning Loss')
     ])
     parser.add_argument('--timestep_field', type=str, default='learner_steps')
     parser.add_argument('--max_steps', type=int, default=np.iinfo(np.int64).max)
