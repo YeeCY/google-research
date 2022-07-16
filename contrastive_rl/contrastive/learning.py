@@ -240,7 +240,7 @@ class ContrastiveLearner(acme.Learner):
             logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
             q_pos, q_neg = jax.nn.sigmoid(logits_pos), jax.nn.sigmoid(logits_neg)
             q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), q_neg / (1 - q_neg)
-            q_ratio = jnp.mean([q_pos_ratio, q_neg_ratio])
+            q_ratio = (q_pos_ratio + q_neg_ratio) / 2
             if len(logits.shape) == 3:
                 logsumexp = jax.nn.logsumexp(logits[:, :, 0], axis=1) ** 2
             else:
