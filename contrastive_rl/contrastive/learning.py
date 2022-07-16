@@ -109,6 +109,7 @@ class ContrastiveLearner(acme.Learner):
         def critic_loss(q_params: networks_lib.Params,
                         policy_params: networks_lib.Params,
                         target_q_params: networks_lib.Params,
+                        behavioral_cloning_policy_params: networks_lib.Params,
                         transitions: types.Transition,
                         key: networks_lib.PRNGKey) -> jnp.ndarray:
             batch_size = transitions.observation.shape[0]
@@ -157,7 +158,8 @@ class ContrastiveLearner(acme.Learner):
                     next_action = transitions.extras['next_action']
                 elif config.fitted_next_action:
                     next_dist_params = networks.behavioral_cloning_policy_network.apply(
-                        policy_params, transitions.next_observation[:, :self._obs_dim])
+                        behavioral_cloning_policy_params,
+                        transitions.next_observation[:, :self._obs_dim])
                     next_action = networks.sample(next_dist_params, key)
                 else:
                     next_dist_params = networks.policy_network.apply(
@@ -329,7 +331,7 @@ class ContrastiveLearner(acme.Learner):
             if not config.use_gcbc:
                 (critic_loss, critic_metrics), critic_grads = critic_grad(
                     state.q_params, state.policy_params, state.target_q_params,
-                    transitions, key_critic)
+                    state.behavioral_cloning_policy_params, transitions, key_critic)
 
             actor_loss, actor_grads = actor_grad(state.policy_params, state.q_params,
                                                  alpha, transitions, key_actor)
