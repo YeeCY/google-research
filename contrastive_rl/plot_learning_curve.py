@@ -121,7 +121,7 @@ def main(args):
             x = data[stats_field][algo][..., 0]
             y = data[stats_field][algo][..., 1:]
 
-            x, y = filter_outliers(x, y)
+            # x, y = filter_outliers(x, y)
 
             mean = window_smooth(np.mean(y, axis=-1))
             std = window_smooth(np.std(y, axis=-1))
@@ -172,7 +172,9 @@ if __name__ == "__main__":
     ])
     parser.add_argument('--env_name', type=str, default='offline_ant_medium_play')
     parser.add_argument('--stats', type=str_triplet, nargs='+', default=[
-        ('evaluator', 'success', 'Success'),
+        # ('evaluator', 'success', 'Success'),
+        ('evaluator', 'success_10', 'Success Rate 10'),
+        ('evaluator', 'success_100', 'Success Rat 100'),
         ('evaluator', 'success_1000', 'Success Rate 1000'),
         ('evaluator', 'final_dist', 'Final Distance'),
         # ('evaluator', 'episode_return', 'Episode Return'),

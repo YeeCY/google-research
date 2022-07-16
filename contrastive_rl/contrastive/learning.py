@@ -178,11 +178,8 @@ class ContrastiveLearner(acme.Learner):
                 # So, the only thing that's meaningful for next_q is the diagonal. Off
                 # diagonal entries are meaningless and shouldn't be used.
                 w = next_v / (1 - next_v)
-                if config.actual_next_action or config.fitted_next_action:
-                    w = jnp.clip(w, 0, 1e25)
-                else:
-                    w_clipping = 20.0
-                    w = jnp.clip(w, 0, w_clipping)
+                w_clipping = 20.0
+                w = jnp.clip(w, 0, w_clipping)
                 # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
                 pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
                 loss_pos = optax.sigmoid_binary_cross_entropy(
