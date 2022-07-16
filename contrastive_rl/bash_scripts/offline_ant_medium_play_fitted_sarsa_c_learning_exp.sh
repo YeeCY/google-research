@@ -18,7 +18,7 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 declare -a seeds=(0 1 2)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=$seed
+  export CUDA_VISIBLE_DEVICES="$(($seed + 5))"
   rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
   rm -r ~/offline_c_learning/contrastive_rl_logs/offline/"${EXP_LABEL}"/offline_ant_medium_play/$seed
   mkdir -p ~/offline_c_learning/contrastive_rl_logs/offline/"${EXP_LABEL}"/offline_ant_medium_play/$seed

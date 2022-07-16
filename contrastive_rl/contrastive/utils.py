@@ -80,7 +80,7 @@ class SuccessObserver(observers_base.EnvLoopObserver):
         """Returns metrics collected for the current episode."""
         return {
             # 'success': float(np.sum(self._rewards) >= 1),
-            'success': np.nan_to_num(self._success[-1]) if len(self._success) > 0 else 0,
+            'success': np.nan_to_num(float(self._success[-1])) if len(self._success) > 0 else 0,
             'success_10': np.nan_to_num(np.mean(self._success[-10:])),
             'success_100': np.nan_to_num(np.mean(self._success[-100:])),
             'success_1000': np.nan_to_num(np.mean(self._success[-1000:])),
