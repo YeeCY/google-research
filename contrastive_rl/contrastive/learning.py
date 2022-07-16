@@ -119,8 +119,10 @@ class ContrastiveLearner(acme.Learner):
             if config.use_td:
                 # For TD learning, the diagonal elements are the immediate next state.
                 s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
-                next_s, _ = jnp.split(transitions.next_observation, [config.obs_dim],
-                                      axis=1)
+                # next_s, _ = jnp.split(transitions.next_observation, [config.obs_dim],
+                #                       axis=1)
+                next_s, next_g = jnp.split(transitions.next_observation, [config.obs_dim],
+                                           axis=1)
                 if config.add_mc_to_td:
                     next_fraction = (1 - config.discount) / ((1 - config.discount) + 1)
                     num_next = int(batch_size * next_fraction)
@@ -135,6 +137,12 @@ class ContrastiveLearner(acme.Learner):
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
             logits = networks.q_network.apply(
                 q_params, transitions.observation, transitions.action)
+            if config.use_td and config.use_eq_5:
+                # (chongyiz): Note we can only do actual next action to sample next future goals
+                # for equation (5)
+                next_g_obs = jnp.concatenate([s, next_g], axis=1)
+                next_g_logits = networks.q_network.apply(
+                    q_params, next_g_obs, transitions.action)
             if config.negative_action_sampling:
                 dist_params = networks.policy_network.apply(
                     policy_params, transitions.observation)
@@ -151,52 +159,70 @@ class ContrastiveLearner(acme.Learner):
                 del s
                 next_s = transitions.next_observation[:, :config.obs_dim]
                 goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
-                g = g[goal_indices]
-                transitions = transitions._replace(
-                    next_observation=jnp.concatenate([next_s, g], axis=1))
-                if config.actual_next_action:
-                    next_action = transitions.extras['next_action']
-                elif config.fitted_next_action:
-                    next_dist_params = networks.behavioral_cloning_policy_network.apply(
-                        behavioral_cloning_policy_params,
-                        transitions.next_observation[:, :self._obs_dim])
-                    next_action = networks.sample(next_dist_params, key)
-                else:
-                    next_dist_params = networks.policy_network.apply(
-                        policy_params, transitions.next_observation)
-                    next_action = networks.sample(next_dist_params, key)
-                next_q = networks.q_network.apply(target_q_params,
-                                                  transitions.next_observation,
-                                                  next_action)  # This outputs logits.
-                next_q = jax.nn.sigmoid(next_q)
-                next_v = jnp.min(next_q, axis=-1)
-                next_v = jax.lax.stop_gradient(next_v)
-                next_v = jnp.diag(next_v)
-                # diag(logits) are predictions for future states.
-                # diag(next_q) are predictions for random states, which correspond to
-                # the predictions logits[range(B), goal_indices].
-                # So, the only thing that's meaningful for next_q is the diagonal. Off
-                # diagonal entries are meaningless and shouldn't be used.
-                w = next_v / (1 - next_v)
-                w_clipping = 20.0
-                w = jnp.clip(w, 0, w_clipping)
-                # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
-                pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
-                loss_pos = optax.sigmoid_binary_cross_entropy(
-                    logits=pos_logits, labels=1)  # [B, 2]
 
-                neg_logits = logits[jnp.arange(batch_size), goal_indices]
-                loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
-                    logits=neg_logits, labels=1)  # [B, 2]
-                loss_neg2 = optax.sigmoid_binary_cross_entropy(
-                    logits=neg_logits, labels=0)  # [B, 2]
+                if config.use_eq_5:
+                    assert len(next_g_logits.shape) == 3
 
-                if config.add_mc_to_td:
-                    loss = ((1 + (1 - config.discount)) * loss_pos
-                            + config.discount * loss_neg1 + 2 * loss_neg2)
+                    pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
+                    loss_pos1 = optax.sigmoid_binary_cross_entropy(
+                        logits=pos_logits, labels=1)  # [B, 2]
+                    next_g_pos_logits = jax.vmap(jnp.diag, -1, -1)(next_g_logits)
+                    loss_pos2 = optax.sigmoid_binary_cross_entropy(
+                        logits=next_g_pos_logits, labels=1)  # [B, 2]
+
+                    neg_logits = logits[jnp.arange(batch_size), goal_indices]
+                    loss_neg = optax.sigmoid_binary_cross_entropy(
+                        logits=neg_logits, labels=0)  # [B, 2]
+
+                    loss = ((1 - config.discount) * loss_pos1
+                            + config.discount * loss_pos2 + loss_neg)
                 else:
-                    loss = ((1 - config.discount) * loss_pos
-                            + config.discount * loss_neg1 + loss_neg2)
+                    g = g[goal_indices]
+                    transitions = transitions._replace(
+                        next_observation=jnp.concatenate([next_s, g], axis=1))
+                    if config.actual_next_action:
+                        next_action = transitions.extras['next_action']
+                    elif config.fitted_next_action:
+                        next_dist_params = networks.behavioral_cloning_policy_network.apply(
+                            behavioral_cloning_policy_params,
+                            transitions.next_observation[:, :self._obs_dim])
+                        next_action = networks.sample(next_dist_params, key)
+                    else:
+                        next_dist_params = networks.policy_network.apply(
+                            policy_params, transitions.next_observation)
+                        next_action = networks.sample(next_dist_params, key)
+                    next_q = networks.q_network.apply(target_q_params,
+                                                      transitions.next_observation,
+                                                      next_action)  # This outputs logits.
+                    next_q = jax.nn.sigmoid(next_q)
+                    next_v = jnp.min(next_q, axis=-1)
+                    next_v = jax.lax.stop_gradient(next_v)
+                    next_v = jnp.diag(next_v)
+                    # diag(logits) are predictions for future states.
+                    # diag(next_q) are predictions for random states, which correspond to
+                    # the predictions logits[range(B), goal_indices].
+                    # So, the only thing that's meaningful for next_q is the diagonal. Off
+                    # diagonal entries are meaningless and shouldn't be used.
+                    w = next_v / (1 - next_v)
+                    w_clipping = 20.0
+                    w = jnp.clip(w, 0, w_clipping)
+                    # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
+                    pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
+                    loss_pos = optax.sigmoid_binary_cross_entropy(
+                        logits=pos_logits, labels=1)  # [B, 2]
+
+                    neg_logits = logits[jnp.arange(batch_size), goal_indices]
+                    loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
+                        logits=neg_logits, labels=1)  # [B, 2]
+                    loss_neg2 = optax.sigmoid_binary_cross_entropy(
+                        logits=neg_logits, labels=0)  # [B, 2]
+
+                    if config.add_mc_to_td:
+                        loss = ((1 + (1 - config.discount)) * loss_pos
+                                + config.discount * loss_neg1 + 2 * loss_neg2)
+                    else:
+                        loss = ((1 - config.discount) * loss_pos
+                                + config.discount * loss_neg1 + loss_neg2)
                 # Take the mean here so that we can compute the accuracy.
                 logits = jnp.mean(logits, axis=-1)
 
@@ -238,7 +264,7 @@ class ContrastiveLearner(acme.Learner):
             logits_pos = jnp.sum(logits * I) / jnp.sum(I)
             logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
             q_pos, q_neg = jax.nn.sigmoid(logits_pos), jax.nn.sigmoid(logits_neg)
-            q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), q_neg / (1 - q_neg)
+            q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), (1 - q_neg) / q_neg
             q_ratio = (q_pos_ratio + q_neg_ratio) / 2
             if len(logits.shape) == 3:
                 logsumexp = jax.nn.logsumexp(logits[:, :, 0], axis=1) ** 2

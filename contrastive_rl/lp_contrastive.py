@@ -169,6 +169,10 @@ def main(_):
         params['use_td'] = True
         params['twin_q'] = True
         params['fitted_next_action'] = True
+    elif alg == 'eq_5_sarsa_c_learning':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['use_eq_5'] = True
     elif alg == 'nce+c_learning':
         params['use_td'] = True
         params['twin_q'] = True

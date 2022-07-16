@@ -64,6 +64,7 @@ class ContrastiveConfig:
     use_cpc: bool = False
     local: bool = False  # Whether running locally. Disables eval.
     use_td: bool = False
+    use_eq_5: bool = False  # (chongyiz): use equation (5) of C-Learning instead of equation (7)
     negative_action_sampling: bool = False  # (chongyiz): MC with negative action sampling
     negative_action_sampling_future_goals: bool = False  # (chongyiz): negative action sampling with future goal
     actual_next_action: bool = False  # (chongyiz): SARSA Q estimation with actual next action
