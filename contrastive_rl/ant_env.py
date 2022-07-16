@@ -17,6 +17,7 @@
 import d4rl
 import gym
 import numpy as np
+import mujoco_py
 
 R = 'r'
 G = 'g'
@@ -129,6 +130,15 @@ class OfflineAntWrapper(gym.ObservationWrapper):
     @property
     def max_episode_steps(self):
         return self.env.max_episode_steps
+
+    def step(self, action):
+        try:
+            obs, reward, done, info = super().step(action)
+        except mujoco_py.MujocoException as me:
+            obs = self.reset()
+            reward, done, info = 0, False, {}
+
+        return obs, reward, done, info
 
 
 def make_offline_ant(env_name):
