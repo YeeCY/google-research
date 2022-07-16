@@ -17,7 +17,6 @@
 import d4rl
 import gym
 import numpy as np
-import mujoco_py
 
 R = 'r'
 G = 'g'
