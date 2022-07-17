@@ -299,6 +299,7 @@ class ContrastiveLearner(acme.Learner):
 
         def actor_loss(policy_params: networks_lib.Params,
                        q_params: networks_lib.Params,
+                       target_q_params: networks_lib.Params,
                        alpha: jnp.ndarray,
                        transitions: types.Transition,
                        key: networks_lib.PRNGKey,
@@ -329,8 +330,12 @@ class ContrastiveLearner(acme.Learner):
                     policy_params, new_obs)
                 action = networks.sample(dist_params, key)
                 log_prob = networks.log_prob(dist_params, action)
-                q_action = networks.q_network.apply(
-                    q_params, new_obs, action)
+                if config.actor_loss_with_target_critic:
+                    q_action = networks.q_network.apply(
+                        target_q_params, new_obs, action)
+                else:
+                    q_action = networks.q_network.apply(
+                        q_params, new_obs, action)
                 if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[2] == 2
                     q_action = jnp.min(q_action, axis=-1)
@@ -373,7 +378,8 @@ class ContrastiveLearner(acme.Learner):
                     state.behavioral_cloning_policy_params, transitions, key_critic)
 
             actor_loss, actor_grads = actor_grad(state.policy_params, state.q_params,
-                                                 alpha, transitions, key_actor)
+                                                 state.target_q_params, alpha,
+                                                 transitions, key_actor)
 
             behavioral_cloning_loss, behavioral_cloning_grads = behavioral_cloning_grad(
                 state.behavioral_cloning_policy_params, transitions, key_behavioral_cloning)

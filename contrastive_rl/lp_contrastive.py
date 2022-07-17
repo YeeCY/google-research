@@ -158,6 +158,13 @@ def main(_):
     elif alg == 'contrastive_nce_future_goal_neg_action_sampling':
         params['negative_action_sampling'] = True
         params['negative_action_sampling_future_goals'] = True
+    elif alg == 'contrastive_nce_random_goal_neg_action_sampling_actor_loss_with_target_critic':
+        params['negative_action_sampling'] = True
+        params['actor_loss_with_target_critic'] = True
+    elif alg == 'contrastive_nce_future_goal_neg_action_sampling_actor_loss_with_target_critic':
+        params['negative_action_sampling'] = True
+        params['negative_action_sampling_future_goals'] = True
+        params['actor_loss_with_target_critic'] = True
     elif alg == 'contrastive_cpc':
         params['use_cpc'] = True
     elif alg == 'c_learning':
