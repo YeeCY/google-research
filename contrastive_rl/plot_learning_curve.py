@@ -131,8 +131,8 @@ def main(args):
     f, axes = plt.subplots(1, len(args.stats))
     if len(args.stats) == 1:
         axes = [axes]
-    f.set_figheight(6)
-    f.set_figwidth(6 * len(args.stats))
+    f.set_figheight(10)
+    f.set_figwidth(10 * len(args.stats))
 
     # read all data
     data = collect_data(root_exp_data_dir, args.stats, args.algos,
@@ -141,7 +141,7 @@ def main(args):
 
     # plot
     num_curves = len(args.algos)
-    cmap = plt.cm.get_cmap('Set2', num_curves)
+    cmap = plt.cm.get_cmap('tab20', num_curves)
     cycol = cycle(cmap.colors)
     for algo_idx, (algo, _) in enumerate(args.algos):
         c = next(cycol)
