@@ -45,6 +45,7 @@ flags.DEFINE_string('alg', 'contrastive_nce',
                     'Select an algorithm to run the experiment')
 flags.DEFINE_integer('seed', 0, 'Random seed')
 flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
+flags.DEFINE_float('tau', 12, 'Value of target smoothing coefficient')
 
 
 @functools.lru_cache()
@@ -140,6 +141,7 @@ def main(_):
         'max_number_of_steps': 15625,  # default = 1_000_000, 15625 for 1M gradient steps in total
         'use_image_obs': 'image' in env_name,
         'w_clipping': FLAGS.w_clipping,
+        'tau': FLAGS.tau,
     }
     if 'ant_' in env_name:
         params['end_index'] = 2
