@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy.interpolate as interp
 from itertools import cycle
 
 
@@ -68,18 +69,45 @@ def collect_data(root_exp_data_dir, stats, algos, env_name,
 
                 # df = pd.read_csv(csv_path)
                 algo_data = []
+                algo_data_timesteps = []
+                algo_data_values = []
                 for idx, csv_path in enumerate(csv_paths):
                     df = pd.read_csv(csv_path)
                     df = df.drop_duplicates(timestep_field, keep='last')
                     df = df[df[timestep_field] <= max_steps // num_sgd_steps_per_step]
-                    if idx == 0:
-                        algo_data.append(
-                            df[timestep_field].values * num_sgd_steps_per_step)
-                    if len(df[stats_field]) < len(algo_data[0]):
-                        algo_data = [data[:len(df[stats_field])] for data in algo_data]
-                        algo_data.append(df[stats_field].values)
+                    algo_data_timesteps.append(
+                        df[timestep_field].values * num_sgd_steps_per_step)
+                    algo_data_values.append(df[stats_field].values)
+                    # if len(df[stats_field]) < len(algo_data[0]):
+                    #     algo_data = [data[:len(df[stats_field])] for data in algo_data]
+                    #     algo_data.append(df[stats_field].values)
+                    # else:
+                    #     algo_data.append(df[stats_field].values[:len(algo_data[0])])
+                    # algo_data_timesteps.append(df[timestep_field].values * num_sgd_steps_per_step)
+                    # algo_data_values.append()
+
+                # Interpolate to the max timesteps
+                ref_idx, max_timestep = 0, 0
+                ref_timesteps = None
+                for idx, timesteps in enumerate(algo_data_timesteps):
+                    if timesteps[-1] >= max_timestep:
+                        ref_idx = idx
+                        ref_timesteps = timesteps
+                        max_timestep = timesteps[-1]
+
+                algo_data.append(ref_timesteps)
+
+                for idx, (timesteps, values) in enumerate(zip(
+                        algo_data_timesteps, algo_data_values)):
+                    if idx != ref_idx:
+                        interpolation = interp.interp1d(
+                            timesteps, values,
+                            bounds_error=False,
+                            fill_value=(values[0], values[-1]))
+                        interp_values = interpolation(ref_timesteps)
+                        algo_data.append(interp_values)
                     else:
-                        algo_data.append(df[stats_field].values[:len(algo_data[0])])
+                        algo_data.append(values)
                 algo_data = np.asarray(algo_data).T
 
                 # df = pd.concat((pd.read_csv(f) for f in all_csv_paths), ignore_index=True)
@@ -112,9 +140,9 @@ def main(args):
                         args.num_sgd_steps_per_step)
 
     # plot
-    # num_curves = len(args.algos)
-    # cmap = plt.cm.get_cmap('hsv', num_curves)
-    cycol = cycle('bgrcmk')
+    num_curves = len(args.algos)
+    cmap = plt.cm.get_cmap('Set2', num_curves)
+    cycol = cycle(cmap.colors)
     for algo_idx, (algo, _) in enumerate(args.algos):
         c = next(cycol)
         for stat_idx, (_, stats_field, stats_name) in enumerate(args.stats):
@@ -189,9 +217,9 @@ if __name__ == "__main__":
         ('learner', 'actor_loss', 'Actor Loss'),
         ('learner', 'critic_loss', 'Critic Loss'),
         ('learner', 'behavioral_cloning_loss', '(Standalone) Behavioral Cloning Loss'),
-        ('learner', 'q_ratio', 'Q Ratio'),
-        ('learner', 'q_pos_ratio', 'Q Positive Ratio'),
-        ('learner', 'q_neg_ratio', 'Q Negative Ratio'),
+        # ('learner', 'q_ratio', 'Q Ratio'),
+        # ('learner', 'q_pos_ratio', 'Q Positive Ratio'),
+        # ('learner', 'q_neg_ratio', 'Q Negative Ratio'),
     ])
     parser.add_argument('--timestep_field', type=str, default='learner_steps')
     parser.add_argument('--max_steps', type=int, default=np.iinfo(np.int64).max)

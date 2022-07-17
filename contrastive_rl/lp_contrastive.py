@@ -44,6 +44,7 @@ flags.DEFINE_string('env_name', 'sawyer_window',
 flags.DEFINE_string('alg', 'contrastive_nce',
                     'Select an algorithm to run the experiment')
 flags.DEFINE_integer('seed', 0, 'Random seed')
+flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
 
 
 @functools.lru_cache()
@@ -138,6 +139,7 @@ def main(_):
         'env_name': env_name,
         'max_number_of_steps': 15625,  # default = 1_000_000, 15625 for 1M gradient steps in total
         'use_image_obs': 'image' in env_name,
+        'w_clipping': FLAGS.w_clipping,
     }
     if 'ant_' in env_name:
         params['end_index'] = 2
