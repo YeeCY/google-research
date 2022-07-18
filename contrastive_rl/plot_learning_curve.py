@@ -114,6 +114,8 @@ def collect_data(root_exp_data_dir, stats, algos, env_name,
             except FileNotFoundError:
                 print(f"CSV path not found: {csv_path}")
                 continue
+            except pd.errors.EmptyDataError:
+                print()
 
             stats_data[algo] = algo_data
         data[stats_field] = stats_data

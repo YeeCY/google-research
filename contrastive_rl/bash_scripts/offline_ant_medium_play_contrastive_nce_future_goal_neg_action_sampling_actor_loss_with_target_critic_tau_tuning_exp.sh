@@ -16,7 +16,7 @@ export XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 #declare -a taus=(0.001 0.0025 0.005 0.01 0.05 0.1)
-declare -a taus=(1e-6 1e-5 1e-4 5e-4)
+declare -a taus=(1e-6 5e-6 1e-5 5e-5 1e-4 5e-4)
 declare -a seeds=(0)
 
 for tau_idx in "${!taus[@]}"; do
