@@ -15,12 +15,14 @@ export D4RL_SUPPRESS_IMPORT_ERROR=1
 export XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
-declare -a taus=(0.001 0.0025 0.005 0.01 0.05 0.1)
+#declare -a taus=(0.001 0.0025 0.005 0.01 0.05 0.1)
+declare -a taus=(1e-6 1e-5 1e-4 5e-4)
 declare -a seeds=(0)
 
 for tau_idx in "${!taus[@]}"; do
   for seed in "${seeds[@]}"; do
-    export CUDA_VISIBLE_DEVICES="$(($tau_idx + 2))"
+#    export CUDA_VISIBLE_DEVICES="$(($tau_idx + 2))"
+    export CUDA_VISIBLE_DEVICES=$tau_idx
     rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
     rm -r ~/offline_c_learning/contrastive_rl_logs/offline/"${EXP_LABEL}"/tau_"${taus[$tau_idx]}"/offline_ant_medium_play/$seed
     mkdir -p ~/offline_c_learning/contrastive_rl_logs/offline/"${EXP_LABEL}"/tau_"${taus[$tau_idx]}"/offline_ant_medium_play/$seed

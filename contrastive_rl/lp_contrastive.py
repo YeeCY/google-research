@@ -45,7 +45,7 @@ flags.DEFINE_string('alg', 'contrastive_nce',
                     'Select an algorithm to run the experiment')
 flags.DEFINE_integer('seed', 0, 'Random seed')
 flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
-flags.DEFINE_float('tau', 12, 'Value of target smoothing coefficient')
+flags.DEFINE_float('tau', 0.005, 'Value of target smoothing coefficient')
 
 
 @functools.lru_cache()
