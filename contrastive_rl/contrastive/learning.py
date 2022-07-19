@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import optax
 import reverb
+import numpy as np
 
 
 class TrainingState(NamedTuple):
@@ -182,10 +183,10 @@ class ContrastiveLearner(acme.Learner):
                         next_observation=jnp.concatenate([next_s, g], axis=1))
                     # TODO (chongyiz): interpolate between C-Learning and SARSA to see what happens
                     assert 0.0 <= config.c_learning_prob <= 1.0
-                    rand = jax.random.uniform(key)
-                    if rand > config.c_learning_prob and config.actual_next_action:
+                    rand = np.random.uniform()
+                    if (rand > config.c_learning_prob) and config.actual_next_action:
                         next_action = transitions.extras['next_action']
-                    elif rand > config.c_learning_prob and config.fitted_next_action:
+                    elif (rand > config.c_learning_prob) and config.fitted_next_action:
                         next_dist_params = networks.behavioral_cloning_policy_network.apply(
                             behavioral_cloning_policy_params,
                             transitions.next_observation[:, :self._obs_dim])
