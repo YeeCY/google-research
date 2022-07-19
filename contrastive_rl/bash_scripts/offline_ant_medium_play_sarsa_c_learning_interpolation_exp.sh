@@ -20,7 +20,11 @@ declare -a seeds=(0)
 
 for c_learning_prob_idx in "${!c_learning_probs[@]}"; do
   for seed in "${seeds[@]}"; do
-    export CUDA_VISIBLE_DEVICES=$c_learning_prob_idx
+    if (($c_learning_prob_idx < 2)); then
+      export CUDA_VISIBLE_DEVICES="$c_learning_prob_idx"
+    else
+      export CUDA_VISIBLE_DEVICES="$(($c_learning_prob_idx + 1))"
+    fi
     rm $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
     rm -r ~/offline_c_learning/contrastive_rl_logs/offline/"${EXP_LABEL}"/c_learning_prob_"${c_learning_probs[$c_learning_prob_idx]}"/offline_ant_medium_play/$seed
     mkdir -p ~/offline_c_learning/contrastive_rl_logs/offline/"${EXP_LABEL}"/c_learning_prob_"${c_learning_probs[$c_learning_prob_idx]}"/offline_ant_medium_play/$seed
