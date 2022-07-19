@@ -155,6 +155,13 @@ def main(_):
     alg = FLAGS.alg
     if alg == 'contrastive_nce':
         pass  # Just use the default hyperparameters
+    elif alg == 'contrastive_nce_random_goal_neg_action_sampling_without_bc':
+        params['negative_action_sampling'] = True
+        params['bc_coef'] = 0.0
+    elif alg == 'contrastive_nce_future_goal_neg_action_sampling_without_bc':
+        params['negative_action_sampling'] = True
+        params['negative_action_sampling_future_goals'] = True
+        params['bc_coef'] = 0.0
     elif alg == 'contrastive_nce_random_goal_neg_action_sampling':
         params['negative_action_sampling'] = True
     elif alg == 'contrastive_nce_future_goal_neg_action_sampling':
@@ -201,7 +208,8 @@ def main(_):
             'samples_per_insert_tolerance_rate': 100_000_000.0,
             # For the actor update, only use future states as goals.
             'random_goals': 0.0,
-            'bc_coef': 0.05,  # Add a behavioral cloning term to the actor.
+            # Add a behavioral cloning term to the actor.
+            'bc_coef': params.get('bc_coef', 0.05),
             'twin_q': True,  # Learn two critics, and take the minimum.
             'batch_size': 1024,  # Increase the batch size 256 --> 1024.
             'repr_dim': 16,  # Decrease the representation size 64 --> 16.
