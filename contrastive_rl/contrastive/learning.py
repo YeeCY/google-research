@@ -180,17 +180,22 @@ class ContrastiveLearner(acme.Learner):
                     g = g[goal_indices]
                     transitions = transitions._replace(
                         next_observation=jnp.concatenate([next_s, g], axis=1))
-                    if config.actual_next_action:
+                    # TODO (chongyiz): interpolate between C-Learning and SARSA to see what happens
+                    assert 0.0 <= config.c_learning_prob <= 1.0
+                    rand = jax.random.uniform(key)
+                    if rand > config.c_learning_prob and config.actual_next_action:
                         next_action = transitions.extras['next_action']
-                    elif config.fitted_next_action:
+                    elif rand > config.c_learning_prob and config.fitted_next_action:
                         next_dist_params = networks.behavioral_cloning_policy_network.apply(
                             behavioral_cloning_policy_params,
                             transitions.next_observation[:, :self._obs_dim])
                         next_action = networks.sample(next_dist_params, key)
-                    else:
+                    elif rand <= config.c_learning_prob:
                         next_dist_params = networks.policy_network.apply(
                             policy_params, transitions.next_observation)
                         next_action = networks.sample(next_dist_params, key)
+                    else:
+                        raise NotImplementedError
                     next_q = networks.q_network.apply(target_q_params,
                                                       transitions.next_observation,
                                                       next_action)  # This outputs logits.

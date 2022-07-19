@@ -68,6 +68,7 @@ class ContrastiveConfig:
     use_eq_5: bool = False  # (chongyiz): use equation (5) of C-Learning instead of equation (7)
     negative_action_sampling: bool = False  # (chongyiz): MC with negative action sampling
     negative_action_sampling_future_goals: bool = False  # (chongyiz): negative action sampling with future goal
+    c_learning_prob: float = 1.0  # (chongyiz): interpolate between C-learning and SARSA
     actual_next_action: bool = False  # (chongyiz): SARSA Q estimation with actual next action
     fitted_next_action: bool = False  # (chongyiz): SARSA Q estimation with fitted next action
     twin_q: bool = False

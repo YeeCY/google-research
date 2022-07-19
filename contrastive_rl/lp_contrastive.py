@@ -46,6 +46,7 @@ flags.DEFINE_string('alg', 'contrastive_nce',
 flags.DEFINE_integer('seed', 0, 'Random seed')
 flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
 flags.DEFINE_float('tau', 0.005, 'Value of target smoothing coefficient')
+flags.DEFINE_float('c_learning_prob', 0.0, 'Value to interpolate between C-Learning and SARSA Q')
 
 
 @functools.lru_cache()
@@ -183,10 +184,12 @@ def main(_):
         params['use_td'] = True
         params['twin_q'] = True
         params['actual_next_action'] = True
+        params['c_learning_prob'] = FLAGS.c_learning_prob
     elif alg == 'fitted_sarsa_c_learning':
         params['use_td'] = True
         params['twin_q'] = True
         params['fitted_next_action'] = True
+        params['c_learning_prob'] = FLAGS.c_learning_prob
     elif alg == 'eq_5_sarsa_c_learning':
         params['use_td'] = True
         params['twin_q'] = True
