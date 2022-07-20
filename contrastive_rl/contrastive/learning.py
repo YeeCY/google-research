@@ -197,6 +197,8 @@ class ContrastiveLearner(acme.Learner):
                         next_action = networks.sample(next_dist_params, key)
                     else:
                         raise NotImplementedError
+                    if config.next_action_add_gaussian_noise:
+                        next_action += jax.random.normal(key, next_action.shape)
                     next_q = networks.q_network.apply(target_q_params,
                                                       transitions.next_observation,
                                                       next_action)  # This outputs logits.

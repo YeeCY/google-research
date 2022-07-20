@@ -71,6 +71,7 @@ class ContrastiveConfig:
     c_learning_prob: float = 1.0  # (chongyiz): interpolate between C-learning and SARSA
     actual_next_action: bool = False  # (chongyiz): SARSA Q estimation with actual next action
     fitted_next_action: bool = False  # (chongyiz): SARSA Q estimation with fitted next action
+    next_action_add_gaussian_noise: bool = False  # (chongyiz): add standard gaussian noise to next action
     twin_q: bool = False
     use_gcbc: bool = False
     use_image_obs: bool = False

@@ -218,8 +218,8 @@ if __name__ == "__main__":
         ('learner', 'critic_loss', 'Critic Loss'),
         ('learner', 'behavioral_cloning_loss', '(Standalone) Behavioral Cloning Loss'),
         # ('learner', 'q_ratio', 'Q Ratio'),
-        # ('learner', 'q_pos_ratio', 'Q Positive Ratio'),
-        # ('learner', 'q_neg_ratio', 'Q Negative Ratio'),
+        ('learner', 'q_pos_ratio', 'Q Positive Ratio'),
+        ('learner', 'q_neg_ratio', 'Q Negative Ratio'),
     ])
     parser.add_argument('--timestep_field', type=str, default='learner_steps')
     parser.add_argument('--max_steps', type=int, default=np.iinfo(np.int64).max)

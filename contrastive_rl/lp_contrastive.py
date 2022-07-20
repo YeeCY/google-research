@@ -185,10 +185,22 @@ def main(_):
         params['twin_q'] = True
         params['actual_next_action'] = True
         params['c_learning_prob'] = FLAGS.c_learning_prob
+    elif alg == 'sarsa_c_learning_noisy_next_action':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['actual_next_action'] = True
+        params['next_action_add_gaussian_noise'] = True
+        params['c_learning_prob'] = FLAGS.c_learning_prob
     elif alg == 'fitted_sarsa_c_learning':
         params['use_td'] = True
         params['twin_q'] = True
         params['fitted_next_action'] = True
+        params['c_learning_prob'] = FLAGS.c_learning_prob
+    elif alg == 'fitted_sarsa_c_learning_noisy_next_action':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['fitted_next_action'] = True
+        params['next_action_add_gaussian_noise'] = True
         params['c_learning_prob'] = FLAGS.c_learning_prob
     elif alg == 'eq_5_sarsa_c_learning':
         params['use_td'] = True
