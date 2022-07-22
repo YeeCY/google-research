@@ -77,6 +77,7 @@ class ContrastiveConfig:
     use_image_obs: bool = False
     random_goals: float = 0.5
     actor_loss_with_target_critic: bool = False
+    actor_loss_with_reverse_kl: bool = False
     jit: bool = True
     add_mc_to_td: bool = False
     resample_neg_actions: bool = False

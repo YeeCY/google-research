@@ -139,7 +139,8 @@ def main(_):
         'use_random_actor': True,
         'entropy_coefficient': None if 'image' in env_name else 0.0,
         'env_name': env_name,
-        'max_number_of_steps': 15625,  # default = 1_000_000, 15625 for 1M gradient steps in total
+        # default max_number_of_steps = 1_000_000, 15625 * 2 for 2M gradient steps in total
+        'max_number_of_steps': 15625 * 2,
         'use_image_obs': 'image' in env_name,
         'w_clipping': FLAGS.w_clipping,
         'tau': FLAGS.tau,
@@ -156,6 +157,8 @@ def main(_):
     alg = FLAGS.alg
     if alg == 'contrastive_nce':
         pass  # Just use the default hyperparameters
+    elif alg == 'contrastive_nce_reverse_kl':
+        params['actor_loss_with_reverse_kl'] = True
     elif alg == 'contrastive_nce_random_goal_neg_action_sampling_without_bc':
         params['negative_action_sampling'] = True
         params['bc_coef'] = 0.0
@@ -180,6 +183,10 @@ def main(_):
     elif alg == 'c_learning':
         params['use_td'] = True
         params['twin_q'] = True
+    elif alg == 'c_learning_reverse_kl':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['actor_loss_with_reverse_kl'] = True
     elif alg == 'sarsa_c_learning':
         params['use_td'] = True
         params['twin_q'] = True

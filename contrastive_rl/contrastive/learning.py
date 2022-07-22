@@ -308,6 +308,7 @@ class ContrastiveLearner(acme.Learner):
         def actor_loss(policy_params: networks_lib.Params,
                        q_params: networks_lib.Params,
                        target_q_params: networks_lib.Params,
+                       behavioral_cloning_policy_params: networks_lib.Params,
                        alpha: jnp.ndarray,
                        transitions: types.Transition,
                        key: networks_lib.PRNGKey,
@@ -347,15 +348,25 @@ class ContrastiveLearner(acme.Learner):
                 if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[2] == 2
                     q_action = jnp.min(q_action, axis=-1)
-                actor_loss = alpha * log_prob - jnp.diag(q_action)
-                assert 0.0 <= config.bc_coef <= 1.0
-                if config.bc_coef > 0:
-                    orig_action = transitions.action
-                    if config.random_goals == 0.5:
-                        orig_action = jnp.concatenate([orig_action, orig_action], axis=0)
+                # TODO (chongyiz): implement reverse KL
+                if config.actor_loss_with_reverse_kl:
+                    behavioral_cloning_dist_params = \
+                        networks.behavioral_cloning_policy_network.apply(
+                            behavioral_cloning_policy_params,
+                            new_obs[:, :self._obs_dim])
+                    log_beta_prob = networks.log_prob(
+                        behavioral_cloning_dist_params, action)
+                    actor_loss = log_prob - log_beta_prob - jnp.diag(q_action)
+                else:
+                    actor_loss = alpha * log_prob - jnp.diag(q_action)
+                    assert 0.0 <= config.bc_coef <= 1.0
+                    if config.bc_coef > 0:
+                        orig_action = transitions.action
+                        if config.random_goals == 0.5:
+                            orig_action = jnp.concatenate([orig_action, orig_action], axis=0)
 
-                    bc_loss = -1.0 * networks.log_prob(dist_params, orig_action)
-                    actor_loss = config.bc_coef * bc_loss + (1 - config.bc_coef) * actor_loss
+                        bc_loss = -1.0 * networks.log_prob(dist_params, orig_action)
+                        actor_loss = config.bc_coef * bc_loss + (1 - config.bc_coef) * actor_loss
 
             return jnp.mean(actor_loss)
 
@@ -386,8 +397,9 @@ class ContrastiveLearner(acme.Learner):
                     state.behavioral_cloning_policy_params, transitions, key_critic)
 
             actor_loss, actor_grads = actor_grad(state.policy_params, state.q_params,
-                                                 state.target_q_params, alpha,
-                                                 transitions, key_actor)
+                                                 state.target_q_params,
+                                                 state.behavioral_cloning_policy_params,
+                                                 alpha, transitions, key_actor)
 
             behavioral_cloning_loss, behavioral_cloning_grads = behavioral_cloning_grad(
                 state.behavioral_cloning_policy_params, transitions, key_behavioral_cloning)
