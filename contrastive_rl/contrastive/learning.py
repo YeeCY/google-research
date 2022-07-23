@@ -95,6 +95,7 @@ class ContrastiveLearner(acme.Learner):
 
         def alpha_loss(log_alpha: jnp.ndarray,
                        policy_params: networks_lib.Params,
+                       behavioral_cloning_policy_params: networks_lib.Params,
                        transitions: types.Transition,
                        key: networks_lib.PRNGKey) -> jnp.ndarray:
             """Eq 18 from https://arxiv.org/pdf/1812.05905.pdf."""
@@ -103,8 +104,19 @@ class ContrastiveLearner(acme.Learner):
             action = networks.sample(dist_params, key)
             log_prob = networks.log_prob(dist_params, action)
             alpha = jnp.exp(log_alpha)
-            alpha_loss = alpha * jax.lax.stop_gradient(
-                -log_prob - config.target_entropy)
+
+            if config.actor_loss_with_reverse_kl:
+                behavioral_cloning_dist_params = \
+                    networks.behavioral_cloning_policy_network.apply(
+                        behavioral_cloning_policy_params,
+                        transitions.observation[:, :self._obs_dim])
+                log_beta_prob = networks.log_prob(
+                    behavioral_cloning_dist_params, action)
+                alpha_loss = alpha * jax.lax.stop_gradient(
+                    log_beta_prob - log_prob - config.target_entropy)
+            else:
+                alpha_loss = alpha * jax.lax.stop_gradient(
+                    -log_prob - config.target_entropy)
             return jnp.mean(alpha_loss)
 
         def critic_loss(q_params: networks_lib.Params,
@@ -356,7 +368,7 @@ class ContrastiveLearner(acme.Learner):
                             new_obs[:, :self._obs_dim])
                     log_beta_prob = networks.log_prob(
                         behavioral_cloning_dist_params, action)
-                    actor_loss = log_prob - log_beta_prob - jnp.diag(q_action)
+                    actor_loss = alpha * (log_prob - log_beta_prob) - jnp.diag(q_action)
                 else:
                     actor_loss = alpha * log_prob - jnp.diag(q_action)
                     assert 0.0 <= config.bc_coef <= 1.0
@@ -385,7 +397,9 @@ class ContrastiveLearner(acme.Learner):
             # key, key_alpha, key_critic, key_actor = jax.random.split(state.key, 4)
             if adaptive_entropy_coefficient:
                 alpha_loss, alpha_grads = alpha_grad(state.alpha_params,
-                                                     state.policy_params, transitions,
+                                                     state.policy_params,
+                                                     state.behavioral_cloning_policy_params,
+                                                     transitions,
                                                      key_alpha)
                 alpha = jnp.exp(state.alpha_params)
             else:
