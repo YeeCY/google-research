@@ -368,7 +368,7 @@ class ContrastiveLearner(acme.Learner):
                             new_obs[:, :self._obs_dim])
                     log_beta_prob = networks.log_prob(
                         behavioral_cloning_dist_params, action)
-                    actor_loss = alpha * (log_prob - log_beta_prob) - jnp.diag(q_action)
+                    actor_loss = config.bc_coef * (log_prob - log_beta_prob) - jnp.diag(q_action)
                 else:
                     actor_loss = alpha * log_prob - jnp.diag(q_action)
                     assert 0.0 <= config.bc_coef <= 1.0
