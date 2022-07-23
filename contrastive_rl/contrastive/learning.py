@@ -224,8 +224,8 @@ class ContrastiveLearner(acme.Learner):
                     # So, the only thing that's meaningful for next_q is the diagonal. Off
                     # diagonal entries are meaningless and shouldn't be used.
                     w = next_v / (1 - next_v)
-                    # w_clipping = 20.0
-                    w_clipping = config.w_clipping
+                    w_clipping = 20.0
+                    # w_clipping = config.w_clipping
                     w = jnp.clip(w, 0, w_clipping)
                     # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
                     pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
@@ -362,13 +362,18 @@ class ContrastiveLearner(acme.Learner):
                     q_action = jnp.min(q_action, axis=-1)
                 # TODO (chongyiz): implement reverse KL
                 if config.actor_loss_with_reverse_kl:
-                    behavioral_cloning_dist_params = \
-                        networks.behavioral_cloning_policy_network.apply(
-                            behavioral_cloning_policy_params,
-                            new_obs[:, :self._obs_dim])
-                    log_beta_prob = networks.log_prob(
-                        behavioral_cloning_dist_params, action)
-                    actor_loss = config.bc_coef * (log_prob - log_beta_prob) - jnp.diag(q_action)
+                    actor_loss = -jnp.diag(q_action)
+                    assert 0.0 <= config.reverse_kl_coef <= 1.0
+                    if config.reverse_kl_coef > 0:
+                        behavioral_cloning_dist_params = \
+                            networks.behavioral_cloning_policy_network.apply(
+                                behavioral_cloning_policy_params,
+                                new_obs[:, :self._obs_dim])
+                        log_beta_prob = networks.log_prob(
+                            behavioral_cloning_dist_params, action)
+                        reverse_kl_loss = log_prob - log_beta_prob
+                        actor_loss = config.reverse_kl_coef * reverse_kl_loss + \
+                                     (1 - config.reverse_kl_coef) * actor_loss
                 else:
                     actor_loss = alpha * log_prob - jnp.diag(q_action)
                     assert 0.0 <= config.bc_coef <= 1.0

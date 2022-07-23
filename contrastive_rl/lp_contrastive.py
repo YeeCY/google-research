@@ -159,6 +159,7 @@ def main(_):
         pass  # Just use the default hyperparameters
     elif alg == 'contrastive_nce_reverse_kl':
         params['actor_loss_with_reverse_kl'] = True
+        params['reverse_kl_coef'] = 0.05
     elif alg == 'contrastive_nce_random_goal_neg_action_sampling_without_bc':
         params['negative_action_sampling'] = True
         params['bc_coef'] = 0.0
@@ -187,6 +188,7 @@ def main(_):
         params['use_td'] = True
         params['twin_q'] = True
         params['actor_loss_with_reverse_kl'] = True
+        params['reverse_kl_coef'] = 0.05
     elif alg == 'sarsa_c_learning':
         params['use_td'] = True
         params['twin_q'] = True
