@@ -194,6 +194,13 @@ def main(_):
         params['twin_q'] = True
         params['actual_next_action'] = True
         params['c_learning_prob'] = FLAGS.c_learning_prob
+    elif alg == 'sarsa_c_learning_reverse_kl':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['actual_next_action'] = True
+        params['c_learning_prob'] = FLAGS.c_learning_prob
+        params['actor_loss_with_reverse_kl'] = True
+        params['reverse_kl_coef'] = 0.05
     elif alg == 'sarsa_c_learning_noisy_next_action':
         params['use_td'] = True
         params['twin_q'] = True
@@ -205,6 +212,13 @@ def main(_):
         params['twin_q'] = True
         params['fitted_next_action'] = True
         params['c_learning_prob'] = FLAGS.c_learning_prob
+    elif alg == 'fitted_sarsa_c_learning_reverse_kl':
+        params['use_td'] = True
+        params['twin_q'] = True
+        params['fitted_next_action'] = True
+        params['c_learning_prob'] = FLAGS.c_learning_prob
+        params['actor_loss_with_reverse_kl'] = True
+        params['reverse_kl_coef'] = 0.05
     elif alg == 'fitted_sarsa_c_learning_noisy_next_action':
         params['use_td'] = True
         params['twin_q'] = True

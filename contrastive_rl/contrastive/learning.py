@@ -148,11 +148,11 @@ class ContrastiveLearner(acme.Learner):
                 obs = jnp.concatenate([s, new_g], axis=1)
                 transitions = transitions._replace(observation=obs)
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
-            # logits = networks.q_network.apply(
-            #     q_params, transitions.observation, transitions.action)
-            # TODO (chongyiz): debug next action here!!!!!
             logits = networks.q_network.apply(
-                q_params, transitions.next_observation, transitions.extras['next_action'])
+                q_params, transitions.observation, transitions.action)
+            # TODO (chongyiz): debug next action here!!!!!
+            # logits = networks.q_network.apply(
+            #     q_params, transitions.next_observation, transitions.extras['next_action'])
             if config.use_td and config.use_eq_5:
                 # (chongyiz): Note we can only do actual next action to sample next future goals
                 # for equation (5)
