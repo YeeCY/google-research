@@ -47,6 +47,7 @@ flags.DEFINE_integer('seed', 0, 'Random seed')
 flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
 flags.DEFINE_float('tau', 0.005, 'Value of target smoothing coefficient')
 flags.DEFINE_float('c_learning_prob', 0.0, 'Value to interpolate between C-Learning and SARSA Q')
+flags.DEFINE_string('trained_agent_dir', None, 'Root directory for trained agent checkpoints.')
 
 
 @functools.lru_cache()
@@ -144,6 +145,7 @@ def main(_):
         'use_image_obs': 'image' in env_name,
         'w_clipping': FLAGS.w_clipping,
         'tau': FLAGS.tau,
+        'trained_agent_dir': FLAGS.trained_agent_dir,
     }
     if 'ant_' in env_name:
         params['end_index'] = 2

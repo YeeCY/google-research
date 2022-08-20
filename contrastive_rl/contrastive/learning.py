@@ -15,6 +15,7 @@
 
 """Contrastive RL learner implementation."""
 import time
+import copy
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Callable
 
 import acme
@@ -23,10 +24,12 @@ from acme.jax import networks as networks_lib
 from acme.jax import utils
 from acme.utils import counting
 from acme.utils import loggers
+from acme.jax import savers
 from contrastive import config as contrastive_config
 from contrastive import networks as contrastive_networks
 import jax
 import jax.numpy as jnp
+import tensorflow as tf
 import optax
 import reverb
 import numpy as np
@@ -62,7 +65,8 @@ class ContrastiveLearner(acme.Learner):
             counter: counting.Counter,
             logger: loggers.Logger,
             obs_to_goal: Callable[jnp.ndarray, jnp.ndarray],
-            config: contrastive_config.ContrastiveConfig):
+            config: contrastive_config.ContrastiveConfig,
+            trained_learner_state: TrainingState = None):
         """Initialize the Contrastive RL learner.
 
         Args:
@@ -92,6 +96,8 @@ class ContrastiveLearner(acme.Learner):
             if config.target_entropy:
                 raise ValueError('target_entropy should not be set when '
                                  'entropy_coefficient is provided')
+
+        self._trained_learner_state = trained_learner_state
 
         def alpha_loss(log_alpha: jnp.ndarray,
                        policy_params: networks_lib.Params,
@@ -150,6 +156,12 @@ class ContrastiveLearner(acme.Learner):
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
             logits = networks.q_network.apply(
                 q_params, transitions.observation, transitions.action)
+            if self._trained_learner_state:
+                oracle_logits = networks.q_network.apply(
+                    self._trained_learner_state.q_params,
+                    transitions.observation,
+                    transitions.action)
+
             # TODO (chongyiz): debug next action here!!!!!
             # logits = networks.q_network.apply(
             #     q_params, transitions.next_observation, transitions.extras['next_action'])
@@ -226,16 +238,32 @@ class ContrastiveLearner(acme.Learner):
                     # the predictions logits[range(B), goal_indices].
                     # So, the only thing that's meaningful for next_q is the diagonal. Off
                     # diagonal entries are meaningless and shouldn't be used.
-                    w = next_v / (1 - next_v)
+                    w_before_clipping = next_v / (1 - next_v)
+
+                    if self._trained_learner_state:
+                        oracle_next_q = networks.q_network.apply(
+                            self._trained_learner_state.q_params,
+                            transitions.next_observation,
+                            next_action
+                        )
+                        oracle_next_v = jax.nn.sigmoid(oracle_next_q)
+                        oracle_next_v = jnp.min(oracle_next_v, axis=-1)
+                        oracle_next_v = jnp.diag(oracle_next_v)
+                        oracle_w = oracle_next_v / (1 - oracle_next_v)
+
                     w_clipping = 20.0
                     # w_clipping = config.w_clipping
-                    w = jnp.clip(w, 0, w_clipping)
+                    w = jnp.clip(w_before_clipping, 0, w_clipping)
                     # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
                     pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
+                    if self._trained_learner_state:
+                        oracle_pos_logits = jax.vmap(jnp.diag, -1, -1)(oracle_logits)
                     loss_pos = optax.sigmoid_binary_cross_entropy(
                         logits=pos_logits, labels=1)  # [B, 2]
 
                     neg_logits = logits[jnp.arange(batch_size), goal_indices]
+                    if self._trained_learner_state:
+                        oracle_neg_logits = oracle_logits[jnp.arange(batch_size), goal_indices]
                     loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
                         logits=neg_logits, labels=1)  # [B, 2]
                     loss_neg2 = optax.sigmoid_binary_cross_entropy(
@@ -287,8 +315,9 @@ class ContrastiveLearner(acme.Learner):
             correct = (jnp.argmax(logits, axis=1) == jnp.argmax(I, axis=1))
             logits_pos = jnp.sum(logits * I) / jnp.sum(I)
             logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
-            q_pos, q_neg = jax.nn.sigmoid(logits_pos), jax.nn.sigmoid(logits_neg)
-            q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), (1 - q_neg) / q_neg
+            q_pos, q_neg = (jax.nn.sigmoid(logits) * I) / jnp.sum(I), \
+                           (jax.nn.sigmoid(logits) * (1 - I)) / jnp.sum(1 - I)
+            q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), q_neg / (1 - q_neg)
             # TODO (chongyiz): The magnitude between q_pos_ratio and q_neg_ratio are unbalanced now!
             # q_ratio = (q_pos_ratio + q_neg_ratio) / 2
             if len(logits.shape) == 3:
@@ -305,6 +334,23 @@ class ContrastiveLearner(acme.Learner):
                 'q_neg_ratio': q_neg_ratio,
                 # 'q_ratio': q_ratio,
             }
+
+            if self._use_td and self._trained_learner_state:
+                oracle_q_pos, oracle_q_neg = \
+                    jax.nn.sigmoid(oracle_pos_logits.mean(axis=-1)), \
+                    jax.nn.sigmoid(oracle_neg_logits.mean(axis=-1))
+                oracle_q_pos_ratio, oracle_q_neg_ratio = \
+                    oracle_q_pos / (1 - oracle_q_pos), \
+                    oracle_q_neg / (1 - oracle_q_neg)
+
+                metrics['w_before_clipping'] = w_before_clipping.mean()
+                metrics['oracle_w_before_clipping'] = oracle_w.mean()
+                metrics['pos_logits'] = pos_logits.mean()
+                metrics['oracle_pos_logits'] = oracle_pos_logits.mean()
+                metrics['neg_logits'] = neg_logits.mean()
+                metrics['oracle_neg_logits'] = oracle_neg_logits.mean()
+                metrics['oracle_q_pos_ratio'] = oracle_q_pos_ratio.mean()
+                metrics['oracle_q_neg_ratio'] = oracle_q_neg_ratio.mean()
 
             return loss, metrics
 
@@ -547,6 +593,28 @@ class ContrastiveLearner(acme.Learner):
         # This is to avoid including the time it takes for actors to come online
         # and fill the replay buffer.
         self._timestamp = None
+
+        # # (chongyiz): load the trained agent here.
+        # if config.trained_agent_dir is not None:
+        #     trained_learner = copy.deepcopy(self)
+        #     ckpt = savers.Checkpointer(
+        #         object_to_save={'learner': trained_learner},
+        #         directory=config.trained_agent_dir,
+        #         subdirectory='learner',
+        #         add_uid=False,
+        #     )
+        #     ckpt.restore()
+        #
+        #     q0 = self._state.q_params.copy()
+        #     q1 = trained_learner._state.q_params.copy()
+        #
+        #     for k, v in q0.items():
+        #         for k_, v_ in v.items():
+        #             assert (q0[k][k_] - q1[k][k_]).sum() != 0, f'New parameters are the same as old {k}.{k_}'
+        #             print(f'{k}.{k_} parameters successfully updated!')
+        #
+        # print()
+        # print()
 
     def step(self):
         with jax.profiler.StepTraceAnnotation('step', step_num=self._counter):

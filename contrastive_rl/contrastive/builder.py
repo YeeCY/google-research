@@ -14,6 +14,8 @@
 # limitations under the License.
 
 """Contrastive RL builder."""
+import os
+import copy
 import functools
 from typing import Callable, Iterator, List, Optional
 
@@ -30,10 +32,13 @@ from acme.jax import networks as networks_lib
 from acme.jax import variable_utils
 from acme.utils import counting
 from acme.utils import loggers
+from acme.jax import savers
+from acme.tf import savers as tf_savers
 from contrastive import config as contrastive_config
 from contrastive import learning
 from contrastive import networks as contrastive_networks
 from contrastive import utils as contrastive_utils
+import jax
 import optax
 import reverb
 from reverb import rate_limiters
@@ -72,6 +77,33 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
         q_optimizer = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
         behavioral_cloning_policy_optimizer = optax.adam(
             learning_rate=self._config.actor_learning_rate, eps=1e-7)
+
+        # (chongyiz): load the trained agent here.
+        trained_learner_state = None
+        if self._config.trained_agent_dir is not None:
+            new_random_key, _ = jax.random.split(random_key)
+            trained_learner = learning.ContrastiveLearner(
+                networks=networks,
+                rng=new_random_key,
+                policy_optimizer=policy_optimizer,
+                q_optimizer=q_optimizer,
+                behavioral_cloning_policy_optimizer=behavioral_cloning_policy_optimizer,
+                iterator=dataset,
+                counter=counter,
+                logger=self._logger_fn(),
+                obs_to_goal=functools.partial(contrastive_utils.obs_to_goal_2d,
+                                              start_index=self._config.start_index,
+                                              end_index=self._config.end_index),
+                config=self._config
+            )
+            ckpt = tf.train.Checkpoint(learner=acme.tf.savers.SaveableAdapter(trained_learner))
+            ckpt_mgr = tf.train.CheckpointManager(
+                ckpt,
+                os.path.expanduser(self._config.trained_agent_dir),
+                1)
+            ckpt.restore(ckpt_mgr.latest_checkpoint).assert_consumed()
+            trained_learner_state = trained_learner._state
+
         return learning.ContrastiveLearner(
             networks=networks,
             rng=random_key,
@@ -84,7 +116,8 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
             obs_to_goal=functools.partial(contrastive_utils.obs_to_goal_2d,
                                           start_index=self._config.start_index,
                                           end_index=self._config.end_index),
-            config=self._config)
+            config=self._config,
+            trained_learner_state=trained_learner_state)
 
     def make_actor(
             self,
