@@ -242,14 +242,14 @@ class ContrastiveLearner(acme.Learner):
 
                     if self._trained_learner_state:
                         oracle_next_q = networks.q_network.apply(
-                            self._trained_learner_state.q_params,
+                            self._trained_learner_state.target_q_params,
                             transitions.next_observation,
                             next_action
                         )
                         oracle_next_v = jax.nn.sigmoid(oracle_next_q)
                         oracle_next_v = jnp.min(oracle_next_v, axis=-1)
                         oracle_next_v = jnp.diag(oracle_next_v)
-                        oracle_w = oracle_next_v / (1 - oracle_next_v)
+                        oracle_w_before_clipping = oracle_next_v / (1 - oracle_next_v)
 
                     w_clipping = 20.0
                     # w_clipping = config.w_clipping
@@ -315,8 +315,8 @@ class ContrastiveLearner(acme.Learner):
             correct = (jnp.argmax(logits, axis=1) == jnp.argmax(I, axis=1))
             logits_pos = jnp.sum(logits * I) / jnp.sum(I)
             logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
-            q_pos, q_neg = (jax.nn.sigmoid(logits) * I) / jnp.sum(I), \
-                           (jax.nn.sigmoid(logits) * (1 - I)) / jnp.sum(1 - I)
+            q_pos, q_neg = jnp.sum(jax.nn.sigmoid(logits) * I) / jnp.sum(I), \
+                           jnp.sum(jax.nn.sigmoid(logits) * (1 - I)) / jnp.sum(1 - I)
             q_pos_ratio, q_neg_ratio = q_pos / (1 - q_pos), q_neg / (1 - q_neg)
             # TODO (chongyiz): The magnitude between q_pos_ratio and q_neg_ratio are unbalanced now!
             # q_ratio = (q_pos_ratio + q_neg_ratio) / 2
@@ -336,19 +336,22 @@ class ContrastiveLearner(acme.Learner):
             }
 
             if self._use_td and self._trained_learner_state:
+                oracle_logits = jnp.mean(oracle_logits, axis=-1)
+                oracle_logits_pos = jnp.sum(oracle_logits * I) / jnp.sum(I)
+                oracle_logits_neg = jnp.sum(oracle_logits * (1 - I)) / jnp.sum(1 - I)
                 oracle_q_pos, oracle_q_neg = \
-                    jax.nn.sigmoid(oracle_pos_logits.mean(axis=-1)), \
-                    jax.nn.sigmoid(oracle_neg_logits.mean(axis=-1))
+                    jnp.sum(jax.nn.sigmoid(oracle_logits) * I) / jnp.sum(I), \
+                    jnp.sum(jax.nn.sigmoid(oracle_logits) * (1 - I)) / jnp.sum(1 - I)
                 oracle_q_pos_ratio, oracle_q_neg_ratio = \
                     oracle_q_pos / (1 - oracle_q_pos), \
                     oracle_q_neg / (1 - oracle_q_neg)
 
                 metrics['w_before_clipping'] = w_before_clipping.mean()
-                metrics['oracle_w_before_clipping'] = oracle_w.mean()
-                metrics['pos_logits'] = pos_logits.mean()
-                metrics['oracle_pos_logits'] = oracle_pos_logits.mean()
-                metrics['neg_logits'] = neg_logits.mean()
-                metrics['oracle_neg_logits'] = oracle_neg_logits.mean()
+                metrics['oracle_w_before_clipping'] = oracle_w_before_clipping.mean()
+                # metrics['pos_logits'] = pos_logits.mean()
+                metrics['oracle_logits_pos'] = oracle_logits_pos
+                # metrics['neg_logits'] = neg_logits.mean()
+                metrics['oracle_logits_neg'] = oracle_logits_neg
                 metrics['oracle_q_pos_ratio'] = oracle_q_pos_ratio.mean()
                 metrics['oracle_q_neg_ratio'] = oracle_q_neg_ratio.mean()
 

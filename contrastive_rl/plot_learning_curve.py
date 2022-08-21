@@ -75,9 +75,16 @@ def collect_data(root_exp_data_dir, stats, algos, env_name,
                     df = pd.read_csv(csv_path)
                     df = df.drop_duplicates(timestep_field, keep='last')
                     df = df[df[timestep_field] <= max_steps // num_sgd_steps_per_step]
-                    algo_data_timesteps.append(
-                        df[timestep_field].values * num_sgd_steps_per_step)
-                    algo_data_values.append(df[stats_field].values)
+
+                    values = df[stats_field].values
+                    timesteps = df[timestep_field].values * num_sgd_steps_per_step
+                    invalid_mask = np.isinf(values) | np.isnan(values)
+                    if np.any(invalid_mask):
+                        values = values[~invalid_mask]
+                        timesteps = timesteps[~invalid_mask]
+
+                    algo_data_timesteps.append(timesteps)
+                    algo_data_values.append(values)
                     # if len(df[stats_field]) < len(algo_data[0]):
                     #     algo_data = [data[:len(df[stats_field])] for data in algo_data]
                     #     algo_data.append(df[stats_field].values)
