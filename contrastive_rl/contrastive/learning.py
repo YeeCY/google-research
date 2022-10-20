@@ -183,8 +183,8 @@ class ContrastiveLearner(acme.Learner):
                 assert len(logits.shape) == 3
 
                 # We evaluate the next-state Q function using random goals
-                s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
-                del s
+                # s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
+                # del s
                 next_s = transitions.next_observation[:, :config.obs_dim]
                 goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
 
@@ -205,9 +205,11 @@ class ContrastiveLearner(acme.Learner):
                     loss = ((1 - config.discount) * loss_pos1
                             + config.discount * loss_pos2 + loss_neg)
                 else:
-                    g = g[goal_indices]
+                    # g = g[goal_indices]
+                    rand_g = new_g[goal_indices]
+
                     transitions = transitions._replace(
-                        next_observation=jnp.concatenate([next_s, g], axis=1))
+                        next_observation=jnp.concatenate([next_s, rand_g], axis=1))
                     # TODO (chongyiz): interpolate between C-Learning and SARSA to see what happens
                     assert 0.0 <= config.c_learning_prob <= 1.0
                     rand = np.random.uniform()
