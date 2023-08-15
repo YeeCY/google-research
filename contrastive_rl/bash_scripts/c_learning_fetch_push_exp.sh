@@ -26,7 +26,7 @@ for seed in "${seeds[@]}"; do
   rm -rf "$LOG_DIR"/"${EXP_LABEL}"/$seed
   mkdir -p "$LOG_DIR"/"${EXP_LABEL}"/$seed
   nohup \
-  python $PROJECT_DIR/lp_td_infonce.py \
+  python $PROJECT_DIR/lp_contrastive.py \
     --env_name=fetch_push \
     --alg=c_learning \
     --max_number_of_steps=1_500_000 \
