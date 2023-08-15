@@ -43,6 +43,10 @@ flags.DEFINE_string('env_name', 'sawyer_window',
                     'Select an environment')
 flags.DEFINE_string('alg', 'contrastive_nce',
                     'Select an algorithm to run the experiment')
+flags.DEFINE_integer('max_number_of_steps', 1_000_000,
+                     'For online RL experiments, max_number_of_steps is the number of '
+                     'environment steps. For offline RL experiments, this is the number of'
+                     'gradient steps.')
 flags.DEFINE_integer('seed', 0, 'Random seed')
 flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
 flags.DEFINE_float('tau', 0.005, 'Value of target smoothing coefficient')
@@ -141,7 +145,7 @@ def main(_):
         'entropy_coefficient': None if 'image' in env_name else 0.0,
         'env_name': env_name,
         # default max_number_of_steps = 1_000_000, 15625 for 1M gradient steps in total
-        'max_number_of_steps': 15625,
+        'max_number_of_steps': FLAGS.max_number_of_steps,
         'use_image_obs': 'image' in env_name,
         'w_clipping': FLAGS.w_clipping,
         'tau': FLAGS.tau,
