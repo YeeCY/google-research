@@ -226,6 +226,7 @@ def make_logger(
         print_fn: Optional[Callable[[str], None]] = None,
         serialize_fn: Optional[Callable[[Mapping[str, Any]], str]] = logger_base.to_numpy,
         steps_key: str = 'steps',
+        flush_every=1,
         log_dir: str = '~/acme',
         log_dir_add_uid: bool = False,
 ) -> logger_base.Logger:
@@ -255,7 +256,8 @@ def make_logger(
         loggers.append(csv.CSVLogger(
             directory_or_file=log_dir,
             label=label,
-            add_uid=log_dir_add_uid))
+            add_uid=log_dir_add_uid,
+            flush_every=flush_every))
 
     # Dispatch to all writers and filter Nones and by time.
     logger = aggregators.Dispatcher(loggers, serialize_fn)

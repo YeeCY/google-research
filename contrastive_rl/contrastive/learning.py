@@ -126,8 +126,12 @@ class ContrastiveLearner(acme.Learner):
                 obs = jnp.concatenate([s, new_g], axis=1)
                 transitions = transitions._replace(observation=obs)
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
+            # logits = networks.q_network.apply(
+            #     q_params, transitions.observation, transitions.action)
             logits = networks.q_network.apply(
-                q_params, transitions.observation, transitions.action)
+                q_params, transitions.observation[:, :config.obs_dim], transitions.action,
+                transitions.observation[:, config.obs_dim:], transitions.observation[:, config.obs_dim:]
+            )
 
             if config.use_td:
                 # Make sure to use the twin Q trick.
@@ -144,9 +148,13 @@ class ContrastiveLearner(acme.Learner):
                 next_dist_params = networks.policy_network.apply(
                     policy_params, transitions.next_observation)
                 next_action = networks.sample(next_dist_params, key)
+                # next_q = networks.q_network.apply(target_q_params,
+                #                                   transitions.next_observation,
+                #                                   next_action)  # This outputs logits.
                 next_q = networks.q_network.apply(target_q_params,
-                                                  transitions.next_observation,
-                                                  next_action)  # This outputs logits.
+                                                  next_s,
+                                                  next_action,
+                                                  g, g)  # This outputs logits.
                 next_q = jax.nn.sigmoid(next_q)
                 next_v = jnp.min(next_q, axis=-1)
                 next_v = jax.lax.stop_gradient(next_v)
@@ -246,8 +254,10 @@ class ContrastiveLearner(acme.Learner):
                     policy_params, new_obs)
                 action = networks.sample(dist_params, key)
                 log_prob = networks.log_prob(dist_params, action)
+                # q_action = networks.q_network.apply(
+                #     q_params, new_obs, action)
                 q_action = networks.q_network.apply(
-                    q_params, new_obs, action)
+                    q_params, new_state, action, new_goal, new_goal)
                 if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[2] == 2
                     q_action = jnp.min(q_action, axis=-1)

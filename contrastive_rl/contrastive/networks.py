@@ -70,57 +70,119 @@ def make_networks(
         goal = jnp.reshape(obs[:, obs_dim:], (-1, 64, 64, 3)) / 255.0
         return state, goal
 
-    def _repr_fn(obs, action, hidden=None):
+    def _unflatten_img(img):
+        img = jnp.reshape(img, (-1, 64, 64, 3)) / 255.0
+        return img
+
+    # def _repr_fn(obs, action, hidden=None):
+    #     # The optional input hidden is the image representations. We include this
+    #     # as an input for the second Q value when twin_q = True, so that the two Q
+    #     # values use the same underlying image representation.
+    #     if hidden is None:
+    #         if use_image_obs:
+    #             state, goal = _unflatten_obs(obs)
+    #             img_encoder = TORSO()
+    #             state = img_encoder(state)
+    #             goal = img_encoder(goal)
+    #         else:
+    #             state = obs[:, :obs_dim]
+    #             goal = obs[:, obs_dim:]
+    #     else:
+    #         state, goal = hidden
+    #
+    #     sa_encoder = hk.nets.MLP(
+    #         list(hidden_layer_sizes) + [repr_dim],
+    #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #         activation=jax.nn.relu,
+    #         name='sa_encoder')
+    #     sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
+    #
+    #     g_encoder = hk.nets.MLP(
+    #         list(hidden_layer_sizes) + [repr_dim],
+    #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #         activation=jax.nn.relu,
+    #         name='g_encoder')
+    #     g_repr = g_encoder(goal)
+    #
+    #     if repr_norm:
+    #         sa_repr = sa_repr / jnp.linalg.norm(sa_repr, axis=1, keepdims=True)
+    #         g_repr = g_repr / jnp.linalg.norm(g_repr, axis=1, keepdims=True)
+    #
+    #         if repr_norm_temp:
+    #             log_scale = hk.get_parameter('repr_log_scale', [], dtype=sa_repr.dtype,
+    #                                          init=jnp.zeros)
+    #             sa_repr = sa_repr / jnp.exp(log_scale)
+    #     return sa_repr, g_repr, (state, goal)
+
+    def _repr_fn(obs, action, goal, future_obs, hidden=None):
         # The optional input hidden is the image representations. We include this
         # as an input for the second Q value when twin_q = True, so that the two Q
         # values use the same underlying image representation.
         if hidden is None:
             if use_image_obs:
-                state, goal = _unflatten_obs(obs)
+                obs = _unflatten_img(obs)
+                goal = _unflatten_img(goal)
+                future_obs = _unflatten_img(future_obs)
                 img_encoder = TORSO()
-                state = img_encoder(state)
+                state = img_encoder(obs)
                 goal = img_encoder(goal)
+                future_state = img_encoder(future_obs)
             else:
-                state = obs[:, :obs_dim]
-                goal = obs[:, obs_dim:]
+                state = obs
+                goal = goal
+                future_state = future_obs
         else:
-            state, goal = hidden
+            # this line of code should match the return values!
+            state, goal, future_state = hidden
 
         sa_encoder = hk.nets.MLP(
             list(hidden_layer_sizes) + [repr_dim],
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='sa_encoder')
-        sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
+        sag_repr = sa_encoder(jnp.concatenate([state, action, goal], axis=-1))
 
         g_encoder = hk.nets.MLP(
             list(hidden_layer_sizes) + [repr_dim],
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='g_encoder')
-        g_repr = g_encoder(goal)
+        fs_repr = g_encoder(goal)
 
         if repr_norm:
-            sa_repr = sa_repr / jnp.linalg.norm(sa_repr, axis=1, keepdims=True)
-            g_repr = g_repr / jnp.linalg.norm(g_repr, axis=1, keepdims=True)
+            sag_repr = sag_repr / jnp.linalg.norm(sag_repr, axis=1, keepdims=True)
+            fs_repr = fs_repr / jnp.linalg.norm(fs_repr, axis=1, keepdims=True)
 
             if repr_norm_temp:
-                log_scale = hk.get_parameter('repr_log_scale', [], dtype=sa_repr.dtype,
+                log_scale = hk.get_parameter('repr_log_scale', [], dtype=sag_repr.dtype,
                                              init=jnp.zeros)
-                sa_repr = sa_repr / jnp.exp(log_scale)
-        return sa_repr, g_repr, (state, goal)
+                sag_repr = sag_repr / jnp.exp(log_scale)
+
+        return sag_repr, fs_repr, (state, goal, future_state)
 
     def _combine_repr(sa_repr, g_repr):
         return jax.numpy.einsum('ik,jk->ij', sa_repr, g_repr)
 
-    def _critic_fn(obs, action):
-        sa_repr, g_repr, hidden = _repr_fn(obs, action)
-        outer = _combine_repr(sa_repr, g_repr)
+    # def _critic_fn(obs, action):
+    #     sa_repr, g_repr, hidden = _repr_fn(obs, action)
+    #     outer = _combine_repr(sa_repr, g_repr)
+    #     if twin_q:
+    #         sa_repr2, g_repr2, _ = _repr_fn(obs, action, hidden=hidden)
+    #         outer2 = _combine_repr(sa_repr2, g_repr2)
+    #         # outer.shape = [batch_size, batch_size, 2]
+    #         outer = jnp.stack([outer, outer2], axis=-1)
+    #     return outer
+
+    def _critic_fn(obs, action, goal, future_obs):
+        sag_repr, fs_repr, hidden = _repr_fn(obs, action, goal, future_obs)
+        outer = _combine_repr(sag_repr, fs_repr)
         if twin_q:
-            sa_repr2, g_repr2, _ = _repr_fn(obs, action, hidden=hidden)
-            outer2 = _combine_repr(sa_repr2, g_repr2)
+            sag_repr2, fs_repr2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
+            outer2 = _combine_repr(sag_repr2, fs_repr2)
             # outer.shape = [batch_size, batch_size, 2]
             outer = jnp.stack([outer, outer2], axis=-1)
+        else:
+            outer = outer[:, :, None]
         return outer
 
     def _actor_fn(obs):
@@ -144,16 +206,40 @@ def make_networks(
     repr_fn = hk.without_apply_rng(hk.transform(_repr_fn))
 
     # Create dummy observations and actions to create network parameters.
+    # dummy_action = utils.zeros_like(spec.actions)
+    # dummy_obs = utils.zeros_like(spec.observations)
+    # dummy_action = utils.add_batch_dim(dummy_action)
+    # dummy_obs = utils.add_batch_dim(dummy_obs)
+
     dummy_action = utils.zeros_like(spec.actions)
-    dummy_obs = utils.zeros_like(spec.observations)
+    dummy_obs = utils.zeros_like(spec.observations)[:obs_dim]
+    dummy_future_obs = utils.zeros_like(spec.observations)[:obs_dim]
+    dummy_goal = utils.zeros_like(spec.observations)[obs_dim:]
+    dummy_obs_and_goal = utils.zeros_like(spec.observations)
     dummy_action = utils.add_batch_dim(dummy_action)
     dummy_obs = utils.add_batch_dim(dummy_obs)
+    dummy_future_obs = utils.add_batch_dim(dummy_future_obs)
+    dummy_goal = utils.add_batch_dim(dummy_goal)
+    dummy_obs_and_goal = utils.add_batch_dim(dummy_obs_and_goal)
 
+    # return ContrastiveNetworks(
+    #     policy_network=networks_lib.FeedForwardNetwork(
+    #         lambda key: policy.init(key, dummy_obs), policy.apply),
+    #     q_network=networks_lib.FeedForwardNetwork(
+    #         lambda key: critic.init(key, dummy_obs, dummy_action), critic.apply),
+    #     repr_fn=repr_fn.apply,
+    #     log_prob=lambda params, actions: params.log_prob(actions),
+    #     sample=lambda params, key: params.sample(seed=key),
+    #     sample_eval=lambda params, key: params.mode(),
+    # )
     return ContrastiveNetworks(
         policy_network=networks_lib.FeedForwardNetwork(
-            lambda key: policy.init(key, dummy_obs), policy.apply),
+            lambda key: policy.init(key, dummy_obs_and_goal), policy.apply
+        ),
         q_network=networks_lib.FeedForwardNetwork(
-            lambda key: critic.init(key, dummy_obs, dummy_action), critic.apply),
+            lambda key: critic.init(key, dummy_obs, dummy_action, dummy_goal, dummy_future_obs),
+            critic.apply
+        ),
         repr_fn=repr_fn.apply,
         log_prob=lambda params, actions: params.log_prob(actions),
         sample=lambda params, key: params.sample(seed=key),

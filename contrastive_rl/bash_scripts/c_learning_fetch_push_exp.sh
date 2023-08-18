@@ -29,7 +29,7 @@ for seed in "${seeds[@]}"; do
   python $PROJECT_DIR/lp_contrastive.py \
     --env_name=fetch_push \
     --alg=c_learning \
-    --max_number_of_steps=1_500_000 \
+    --max_number_of_steps=3_000_000 \
     --seed="$seed" \
     --lp_launch_type=local_mp \
     --root_dir="$LOG_DIR"/"${EXP_LABEL}"/$seed \

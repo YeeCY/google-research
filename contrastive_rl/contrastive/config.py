@@ -32,7 +32,7 @@ class ContrastiveConfig:
     steps_key: str = 'actor_steps'
 
     # Loss options
-    batch_size: int = 256
+    batch_size: int = 1024
     actor_learning_rate: float = 3e-4
     learning_rate: float = 3e-4
     reward_scale: float = 1
