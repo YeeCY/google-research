@@ -52,6 +52,8 @@ flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
 flags.DEFINE_float('tau', 0.005, 'Value of target smoothing coefficient')
 flags.DEFINE_float('c_learning_prob', 0.0, 'Value to interpolate between C-Learning and SARSA Q')
 flags.DEFINE_string('trained_agent_dir', None, 'Root directory for trained agent checkpoints.')
+flags.DEFINE_bool('exp_log_dir_add_uid', False,
+                  'Enables / disables unique id for the log directory')
 
 
 @functools.lru_cache()
@@ -107,7 +109,8 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
         num_actors=config.num_actors,
         log_to_bigtable=True,
         max_number_of_steps=config.max_number_of_steps,
-        root_dir=FLAGS.root_dir)
+        root_dir=FLAGS.root_dir,
+        log_dir_add_uid=FLAGS.exp_log_dir_add_uid)
     return agent.build()
 
 

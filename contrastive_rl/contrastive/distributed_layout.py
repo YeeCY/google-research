@@ -286,6 +286,10 @@ class DistributedLayout:
 
         # Create logger and counter.
         counter = counting.Counter(counter, 'actor')
+        # (chongyi): dummy increment to prevent field missing in the evaluator CSV log
+        if actor_id == 0:
+            counter.increment(steps=0)
+
         # Only actor #0 will write to bigtable in order not to spam it too much.
         logger = self._actor_logger_fn(actor_id)
         # Create the loop to connect environment and agent.

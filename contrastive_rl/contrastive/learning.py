@@ -173,6 +173,10 @@ class ContrastiveLearner(acme.Learner):
                     logits=pos_logits, labels=1)  # [B, 2]
 
                 neg_logits = logits[jnp.arange(batch_size), goal_indices]
+                debug_logits = networks.q_network.apply(
+                    q_params, transitions.observation[:, :config.obs_dim], transitions.action,
+                    g, g)
+                debug_logits = debug_logits[jnp.arange(batch_size), jnp.arange(batch_size)]
                 loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
                     logits=neg_logits, labels=1)  # [B, 2]
                 loss_neg2 = optax.sigmoid_binary_cross_entropy(
