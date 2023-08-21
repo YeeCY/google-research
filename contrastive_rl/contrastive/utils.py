@@ -287,10 +287,13 @@ class InitiallyRandomActor(actors.GenericActor):
                 action = jax.random.randint(
                     key=rng, shape=(), minval=0, maxval=num_actions)
                 action = jax.nn.one_hot(action, num_actions)
+            elif 'mlp/~/linear_2' in self._params:
+                num_actions = np.prod(self._params['mlp/~/linear_2']['b'].shape)
+                rng, self._state = jax.random.split(self._state)
+                action = jax.random.randint(
+                    key=rng, shape=(), minval=0, maxval=num_actions)
+                action = jax.nn.one_hot(action, num_actions)
         else:
             action, self._state = self._policy(self._params, observation,
                                                self._state)
-            # if 'relaxed_onehot_categorical_head/~/linear' in self._params:
-            #     num_actions = np.prod(self._params['relaxed_onehot_categorical_head/~/linear']['b'].shape)
-            #     action = jax.nn.one_hot(action.argmax(), num_actions)
         return utils.to_numpy(action)

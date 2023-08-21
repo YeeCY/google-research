@@ -114,59 +114,70 @@ class ContrastiveLearner(acme.Learner):
                 s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
                 next_s, _ = jnp.split(transitions.next_observation, [config.obs_dim],
                                       axis=1)
-                if config.add_mc_to_td:
-                    next_fraction = (1 - config.discount) / ((1 - config.discount) + 1)
-                    num_next = int(batch_size * next_fraction)
-                    new_g = jnp.concatenate([
-                        obs_to_goal(next_s[:num_next]),
-                        g[num_next:],
-                    ], axis=0)
-                else:
-                    new_g = obs_to_goal(next_s)
-                obs = jnp.concatenate([s, new_g], axis=1)
-                transitions = transitions._replace(observation=obs)
+                # if config.add_mc_to_td:
+                #     next_fraction = (1 - config.discount) / ((1 - config.discount) + 1)
+                #     num_next = int(batch_size * next_fraction)
+                #     new_g = jnp.concatenate([
+                #         obs_to_goal(next_s[:num_next]),
+                #         g[num_next:],
+                #     ], axis=0)
+                # else:
+                #     new_g = obs_to_goal(next_s)
+                # obs = jnp.concatenate([s, new_g], axis=1)
+                # transitions = transitions._replace(observation=obs)
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
             # logits = networks.q_network.apply(
             #     q_params, transitions.observation, transitions.action)
             # logits = networks.q_network.apply(
             #     q_params, s, transitions.action, next_s, next_s,
             # )
-            logits = networks.q_network.apply(
-                q_params, transitions.observation[:, :config.obs_dim], transitions.action,
-                transitions.observation[:, config.obs_dim:], transitions.observation[:, config.obs_dim:]
-            )
+            # logits = networks.q_network.apply(
+            #     q_params, transitions.observation[:, :config.obs_dim], transitions.action,
+            #     transitions.observation[:, config.obs_dim:], transitions.observation[:, config.obs_dim:]
+            # )
+            # logits = networks.q_network.apply(
+            #     q_params, s, g, next_s)
+            # pos_logits = jnp.einsum('ijkl,ik->ijl', logits, transitions.action)
+            pos_logits = networks.q_network.apply(
+                q_params, s, g, next_s)
 
             if config.use_td:
                 # Make sure to use the twin Q trick.
-                assert len(logits.shape) == 3
+                assert len(logits.shape) == 4
 
                 # We evaluate the next-state Q function using random goals
                 s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
-                del s
+                # del s
                 next_s = transitions.next_observation[:, :config.obs_dim]
                 goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
                 # rand_g = next_s[goal_indices]
-                g = g[goal_indices]
+                rand_g = g[goal_indices]
                 transitions = transitions._replace(
                     next_observation=jnp.concatenate([next_s, g], axis=1))
                 next_dist_params = networks.policy_network.apply(
                     policy_params, transitions.next_observation)
-                next_action = networks.sample(next_dist_params, key)
-                index = next_action.argmax(axis=-1)
-                hard_next_action = jax.nn.one_hot(index, 5)
-                hard_next_action = hard_next_action - jax.lax.stop_gradient(next_action) + next_action
+                c = next_dist_params.cumsum(axis=1)
+                u = jax.random.uniform(key, shape=(len(c), 1))
+                next_action = (u < c).argmax(axis=1)
+                # next_action = networks.sample(next_dist_params, key)
+                # index = next_action.argmax(axis=-1)
+                # hard_next_action = jax.nn.one_hot(index, 5)
+                # hard_next_action = hard_next_action - jax.lax.stop_gradient(next_action) + next_action
                 # next_q = networks.q_network.apply(target_q_params,
                 #                                   transitions.next_observation,
                 #                                   next_action)  # This outputs logits.
+                # next_q = networks.q_network.apply(target_q_params,
+                #                                   next_s,
+                #                                   hard_next_action,
+                #                                   g, g)  # This outputs logits.
                 next_q = networks.q_network.apply(target_q_params,
-                                                  next_s,
-                                                  hard_next_action,
-                                                  g, g)  # This outputs logits.
+                                                  next_s, g, rand_g)
+
                 # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
                 next_q = jax.nn.sigmoid(next_q)
                 next_v = jnp.min(next_q, axis=-1)
                 next_v = jax.lax.stop_gradient(next_v)
-                next_v = jnp.diag(next_v)
+                next_v = jax.vmap(jnp.diag, -1, -1)(next_v)
                 # diag(logits) are predictions for future states.
                 # diag(next_q) are predictions for random states, which correspond to
                 # the predictions logits[range(B), goal_indices].
@@ -175,13 +186,17 @@ class ContrastiveLearner(acme.Learner):
                 w = next_v / (1 - next_v)
                 w_clipping = 20.0
                 w = jnp.clip(w, 0, w_clipping)
+                w = jnp.einsum('ij,ij->i', w, jax.nn.one_hot(next_action, 5))
                 # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
-                pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
+                pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
                 loss_pos = optax.sigmoid_binary_cross_entropy(
                     logits=pos_logits, labels=1)  # [B, 2]
 
-                neg_logits = logits[jnp.arange(batch_size), goal_indices]
+                # neg_logits = logits[jnp.arange(batch_size), goal_indices]
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
+                neg_logits = networks.q_network.apply(q_params, s, g, rand_g)
+                neg_logits = jnp.einsum('ijkl,ik->ijl', neg_logits, transitions.action)
+                neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
                 loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
                     logits=neg_logits, labels=1)  # [B, 2]
                 loss_neg2 = optax.sigmoid_binary_cross_entropy(
@@ -214,19 +229,19 @@ class ContrastiveLearner(acme.Learner):
                     loss = loss_fn(logits)
 
             loss = jnp.mean(loss)
-            correct = (jnp.argmax(logits, axis=1) == jnp.argmax(I, axis=1))
-            logits_pos = jnp.sum(logits * I) / jnp.sum(I)
-            logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
-            if len(logits.shape) == 3:
-                logsumexp = jax.nn.logsumexp(logits[:, :, 0], axis=1) ** 2
-            else:
-                logsumexp = jax.nn.logsumexp(logits, axis=1) ** 2
+            # correct = (jnp.argmax(logits, axis=1) == jnp.argmax(I, axis=1))
+            # logits_pos = jnp.sum(logits * I) / jnp.sum(I)
+            # logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
+            # if len(logits.shape) == 3:
+            #     logsumexp = jax.nn.logsumexp(logits[:, :, 0], axis=1) ** 2
+            # else:
+            #     logsumexp = jax.nn.logsumexp(logits, axis=1) ** 2
             metrics = {
-                'binary_accuracy': jnp.mean((logits > 0) == I),
-                'categorical_accuracy': jnp.mean(correct),
-                'logits_pos': logits_pos,
-                'logits_neg': logits_neg,
-                'logsumexp': logsumexp.mean(),
+                # 'binary_accuracy': jnp.mean((logits > 0) == I),
+                # 'categorical_accuracy': jnp.mean(correct),
+                'logits_pos': jnp.mean(pos_logits),
+                'logits_neg': jnp.mean(neg_logits),
+                # 'logsumexp': logsumexp.mean(),
                 'w': jnp.mean(w),
             }
 
@@ -260,21 +275,25 @@ class ContrastiveLearner(acme.Learner):
                     new_goal = jnp.roll(goal, 1, axis=0)
 
                 new_obs = jnp.concatenate([new_state, new_goal], axis=1)
-                dist_params = networks.policy_network.apply(
+                action_dist = networks.policy_network.apply(
                     policy_params, new_obs)
-                action = networks.sample(dist_params, key)
-                log_prob = networks.log_prob(dist_params, action)
-                index = action.argmax(axis=-1)
-                hard_action = jax.nn.one_hot(index, 5)
-                hard_action = hard_action - jax.lax.stop_gradient(action) + action
+                # action_dist = networks.sample(dist_params, key)
+                # log_prob = networks.log_prob(dist_params, action)
+                # index = action.argmax(axis=-1)
+                # hard_action = jax.nn.one_hot(index, 5)
+                # hard_action = hard_action - jax.lax.stop_gradient(action) + action
                 # q_action = networks.q_network.apply(
                 #     q_params, new_obs, action)
+                # q_action = networks.q_network.apply(
+                #     q_params, new_state, hard_action, new_goal, new_goal)
                 q_action = networks.q_network.apply(
-                    q_params, new_state, hard_action, new_goal, new_goal)
-                if len(q_action.shape) == 3:  # twin q trick
-                    assert q_action.shape[2] == 2
+                    q_params, new_state, new_goal, new_goal)
+                if len(q_action.shape) == 4:  # twin q trick
+                    assert q_action.shape[-1] == 2
                     q_action = jnp.min(q_action, axis=-1)
-                actor_loss = alpha * log_prob - jnp.diag(q_action)
+                # actor_loss = alpha * log_prob - jnp.diag(q_action)
+                q_action = jnp.sum(q_action * action_dist[:, None, :], axis=-1)
+                actor_loss = -jnp.diag(q_action)
 
                 assert 0.0 <= config.bc_coef <= 1.0
                 if config.bc_coef > 0:

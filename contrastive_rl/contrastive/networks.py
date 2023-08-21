@@ -126,7 +126,7 @@ def make_networks(
     #             sa_repr = sa_repr / jnp.exp(log_scale)
     #     return sa_repr, g_repr, (state, goal)
 
-    def _repr_fn(obs, action, goal, future_obs, hidden=None):
+    def _repr_fn(obs, goal, future_obs, hidden=None):
         # The optional input hidden is the image representations. We include this
         # as an input for the second Q value when twin_q = True, so that the two Q
         # values use the same underlying image representation.
@@ -148,25 +148,25 @@ def make_networks(
             state, goal, future_state = hidden
 
         sa_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim],
+            list(hidden_layer_sizes) + [repr_dim * num_dimensions],
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='sa_encoder')
-        sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
+        sa_repr = sa_encoder(state).reshape([-1, repr_dim, num_dimensions])
 
         g_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim * repr_dim],
+            list(hidden_layer_sizes) + [repr_dim * repr_dim * num_dimensions],
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='g_encoder')
-        g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])
+        g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim, num_dimensions])
 
         fs_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim],
+            list(hidden_layer_sizes) + [repr_dim * num_dimensions],
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='fs_encoder')
-        fs_repr = fs_encoder(future_state)
+        fs_repr = fs_encoder(future_state).reshape([-1, repr_dim, num_dimensions])
 
         if repr_norm:
             sag_repr = sag_repr / jnp.linalg.norm(sag_repr, axis=1, keepdims=True)
@@ -180,12 +180,12 @@ def make_networks(
         return sa_repr, g_repr, fs_repr, (state, goal, future_state)
 
     def _combine_repr(sa_repr, g_repr, fs_repr):
-        gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
+        # gfs_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, fs_repr)
         # we should use the goal representation together with the sa_repr
-        # sag_repr = jnp.einsum('ijk,ik->ij', g_repr, sa_repr)
+        sag_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, sa_repr)
 
-        return jax.numpy.einsum('ik,jk->ij', sa_repr, gfs_repr)
-        # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
+        # return jax.numpy.einsum('ikl,jkl->ijl', sa_repr, gfs_repr)
+        return jax.numpy.einsum('ikl,jkl->ijl', sag_repr, fs_repr)
 
     # def _critic_fn(obs, action):
     #     sa_repr, g_repr, hidden = _repr_fn(obs, action)
@@ -197,11 +197,11 @@ def make_networks(
     #         outer = jnp.stack([outer, outer2], axis=-1)
     #     return outer
 
-    def _critic_fn(obs, action, goal, future_obs):
-        sa_repr, g_repr, fs_repr, hidden = _repr_fn(obs, action, goal, future_obs)
+    def _critic_fn(obs, goal, future_obs):
+        sa_repr, g_repr, fs_repr, hidden = _repr_fn(obs, goal, future_obs)
         outer = _combine_repr(sa_repr, g_repr, fs_repr)
         if twin_q:
-            sa_repr2, g_repr2, fs_repr2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
+            sa_repr2, g_repr2, fs_repr2, _ = _repr_fn(obs, goal, future_obs, hidden=hidden)
             outer2 = _combine_repr(sa_repr2, g_repr2, fs_repr2)
             # outer.shape = [batch_size, batch_size, 2]
             outer = jnp.stack([outer, outer2], axis=-1)
@@ -225,15 +225,16 @@ def make_networks(
         # ])
         network = hk.Sequential([
             hk.nets.MLP(
-                list(hidden_layer_sizes),
+                list(hidden_layer_sizes) + [num_dimensions],
                 w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
                 activation=jax.nn.relu,
-                activate_final=True),
+                activate_final=False),
             # networks_lib.NormalTanhDistribution(num_dimensions,
             #                                     min_scale=actor_min_std),
             # jax.nn.softmax,
             # networks_lib.DiscreteValued
-            RelaxedOnehotCategoricalHead(num_dimensions)
+            # RelaxedOnehotCategoricalHead(num_dimensions)
+            jax.nn.softmax,
         ])
 
         return network(obs)
@@ -270,9 +271,17 @@ def make_networks(
     #     sample_eval=lambda params, key: params.mode(),
     # )
 
+    def sample(params, key):
+        c = params.cumsum(axis=1)
+        u = jax.random.uniform(key, shape=(len(c), 1))
+        action = (u < c).argmax(axis=1)
+        action = jax.nn.one_hot(action, num_dimensions)
+
+        return action
+
     def sample_eval(params, key):
-        logits = params.logits
-        action = logits.argmax(axis=-1)
+        # logits = params.logits
+        action = params.argmax(axis=-1)
         action = jax.nn.one_hot(action, num_dimensions)
 
         return action
@@ -282,12 +291,13 @@ def make_networks(
             lambda key: policy.init(key, dummy_obs_and_goal), policy.apply
         ),
         q_network=networks_lib.FeedForwardNetwork(
-            lambda key: critic.init(key, dummy_obs, dummy_action, dummy_goal, dummy_future_obs),
+            lambda key: critic.init(key, dummy_obs, dummy_goal, dummy_future_obs),
             critic.apply
         ),
         repr_fn=repr_fn.apply,
         log_prob=lambda params, actions: params.log_prob(actions),
-        sample=lambda params, key: params.sample(seed=key),
+        # sample=lambda params, key: params.sample(seed=key),
+        sample=sample,
         # sample_eval=lambda params, key: params.mode(),
         sample_eval=sample_eval,
     )
