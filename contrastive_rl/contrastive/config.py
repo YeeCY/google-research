@@ -44,7 +44,7 @@ class ContrastiveConfig:
     target_entropy: float = 0.0
     # Target smoothing coefficient.
     tau: float = 0.005
-    hidden_layer_sizes: Tuple[int, ...] = (256, 256)
+    hidden_layer_sizes: Tuple[int, ...] = (512, 512)
 
     # Replay options
     min_replay_size: int = 10000
