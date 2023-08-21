@@ -147,26 +147,33 @@ def make_networks(
             # this line of code should match the return values!
             state, goal, future_state = hidden
 
-        sa_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim * num_dimensions],
-            w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
-            activation=jax.nn.relu,
-            name='sa_encoder')
-        sa_repr = sa_encoder(state).reshape([-1, repr_dim, num_dimensions])
+        # sa_encoder = hk.nets.MLP(
+        #     list(hidden_layer_sizes) + [repr_dim * num_dimensions],
+        #     w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+        #     activation=jax.nn.relu,
+        #     name='sa_encoder')
+        # sa_repr = sa_encoder(state).reshape([-1, repr_dim, num_dimensions])
+        #
+        # g_encoder = hk.nets.MLP(
+        #     list(hidden_layer_sizes) + [repr_dim * repr_dim * num_dimensions],
+        #     w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+        #     activation=jax.nn.relu,
+        #     name='g_encoder')
+        # g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim, num_dimensions])
+        #
+        # fs_encoder = hk.nets.MLP(
+        #     list(hidden_layer_sizes) + [repr_dim * num_dimensions],
+        #     w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+        #     activation=jax.nn.relu,
+        #     name='fs_encoder')
+        # fs_repr = fs_encoder(future_state).reshape([-1, repr_dim, num_dimensions])
 
-        g_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim * repr_dim * num_dimensions],
+        logit_encoder = hk.nets.MLP(
+            list(hidden_layer_sizes) + [num_dimensions],
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
-            name='g_encoder')
-        g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim, num_dimensions])
-
-        fs_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim * num_dimensions],
-            w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
-            activation=jax.nn.relu,
-            name='fs_encoder')
-        fs_repr = fs_encoder(future_state).reshape([-1, repr_dim, num_dimensions])
+            name='logit_encoder')
+        logits = logit_encoder(jnp.concatenate([state, goal, future_state], axis=-1))
 
         if repr_norm:
             sag_repr = sag_repr / jnp.linalg.norm(sag_repr, axis=1, keepdims=True)
@@ -177,7 +184,7 @@ def make_networks(
                                              init=jnp.zeros)
                 sag_repr = sag_repr / jnp.exp(log_scale)
 
-        return sa_repr, g_repr, fs_repr, (state, goal, future_state)
+        return logits, (state, goal, future_state)
 
     def _combine_repr(sa_repr, g_repr, fs_repr):
         # gfs_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, fs_repr)
@@ -198,16 +205,16 @@ def make_networks(
     #     return outer
 
     def _critic_fn(obs, goal, future_obs):
-        sa_repr, g_repr, fs_repr, hidden = _repr_fn(obs, goal, future_obs)
-        outer = _combine_repr(sa_repr, g_repr, fs_repr)
+        logits, hidden = _repr_fn(obs, goal, future_obs)
+        # outer = _combine_repr(sa_repr, g_repr, fs_repr)
         if twin_q:
-            sa_repr2, g_repr2, fs_repr2, _ = _repr_fn(obs, goal, future_obs, hidden=hidden)
-            outer2 = _combine_repr(sa_repr2, g_repr2, fs_repr2)
+            logits2, _ = _repr_fn(obs, goal, future_obs, hidden=hidden)
+            # outer2 = _combine_repr(sa_repr2, g_repr2, fs_repr2)
             # outer.shape = [batch_size, batch_size, 2]
-            outer = jnp.stack([outer, outer2], axis=-1)
+            logits = jnp.stack([logits, logits2], axis=-1)
         else:
-            outer = outer[:, :, None]
-        return outer
+            logits = logits[:, :, None]
+        return logits
 
     def _actor_fn(obs):
         if use_image_obs:
