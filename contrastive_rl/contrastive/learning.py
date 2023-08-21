@@ -128,6 +128,9 @@ class ContrastiveLearner(acme.Learner):
             I = jnp.eye(batch_size)  # pylint: disable=invalid-name
             # logits = networks.q_network.apply(
             #     q_params, transitions.observation, transitions.action)
+            # logits = networks.q_network.apply(
+            #     q_params, s, transitions.action, next_s, next_s,
+            # )
             logits = networks.q_network.apply(
                 q_params, transitions.observation[:, :config.obs_dim], transitions.action,
                 transitions.observation[:, config.obs_dim:], transitions.observation[:, config.obs_dim:]
@@ -142,19 +145,24 @@ class ContrastiveLearner(acme.Learner):
                 del s
                 next_s = transitions.next_observation[:, :config.obs_dim]
                 goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
+                # rand_g = next_s[goal_indices]
                 g = g[goal_indices]
                 transitions = transitions._replace(
                     next_observation=jnp.concatenate([next_s, g], axis=1))
                 next_dist_params = networks.policy_network.apply(
                     policy_params, transitions.next_observation)
                 next_action = networks.sample(next_dist_params, key)
+                index = next_action.argmax(axis=-1)
+                hard_next_action = jax.nn.one_hot(index, 5)
+                hard_next_action = hard_next_action - jax.lax.stop_gradient(next_action) + next_action
                 # next_q = networks.q_network.apply(target_q_params,
                 #                                   transitions.next_observation,
                 #                                   next_action)  # This outputs logits.
                 next_q = networks.q_network.apply(target_q_params,
                                                   next_s,
-                                                  next_action,
+                                                  hard_next_action,
                                                   g, g)  # This outputs logits.
+                # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
                 next_q = jax.nn.sigmoid(next_q)
                 next_v = jnp.min(next_q, axis=-1)
                 next_v = jax.lax.stop_gradient(next_v)
@@ -173,10 +181,7 @@ class ContrastiveLearner(acme.Learner):
                     logits=pos_logits, labels=1)  # [B, 2]
 
                 neg_logits = logits[jnp.arange(batch_size), goal_indices]
-                debug_logits = networks.q_network.apply(
-                    q_params, transitions.observation[:, :config.obs_dim], transitions.action,
-                    g, g)
-                debug_logits = debug_logits[jnp.arange(batch_size), jnp.arange(batch_size)]
+                # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
                 loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
                     logits=neg_logits, labels=1)  # [B, 2]
                 loss_neg2 = optax.sigmoid_binary_cross_entropy(
@@ -222,6 +227,7 @@ class ContrastiveLearner(acme.Learner):
                 'logits_pos': logits_pos,
                 'logits_neg': logits_neg,
                 'logsumexp': logsumexp.mean(),
+                'w': jnp.mean(w),
             }
 
             return loss, metrics
@@ -258,10 +264,13 @@ class ContrastiveLearner(acme.Learner):
                     policy_params, new_obs)
                 action = networks.sample(dist_params, key)
                 log_prob = networks.log_prob(dist_params, action)
+                index = action.argmax(axis=-1)
+                hard_action = jax.nn.one_hot(index, 5)
+                hard_action = hard_action - jax.lax.stop_gradient(action) + action
                 # q_action = networks.q_network.apply(
                 #     q_params, new_obs, action)
                 q_action = networks.q_network.apply(
-                    q_params, new_state, action, new_goal, new_goal)
+                    q_params, new_state, hard_action, new_goal, new_goal)
                 if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[2] == 2
                     q_action = jnp.min(q_action, axis=-1)

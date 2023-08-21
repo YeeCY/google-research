@@ -276,11 +276,21 @@ class InitiallyRandomActor(actors.GenericActor):
     def select_action(self,
                       observation: network_lib.Observation) -> types.NestedArray:
         if (self._params['mlp/~/linear_0']['b'] == 0).all():
-            shape = self._params['Normal/~/linear']['b'].shape
-            rng, self._state = jax.random.split(self._state)
-            action = jax.random.uniform(key=rng, shape=shape,
-                                        minval=-1.0, maxval=1.0)
+            if 'Normal/~/linear' in self._params:
+                shape = self._params['Normal/~/linear']['b'].shape
+                rng, self._state = jax.random.split(self._state)
+                action = jax.random.uniform(key=rng, shape=shape,
+                                            minval=-1.0, maxval=1.0)
+            elif 'relaxed_onehot_categorical_head/~/linear' in self._params:
+                num_actions = np.prod(self._params['relaxed_onehot_categorical_head/~/linear']['b'].shape)
+                rng, self._state = jax.random.split(self._state)
+                action = jax.random.randint(
+                    key=rng, shape=(), minval=0, maxval=num_actions)
+                action = jax.nn.one_hot(action, num_actions)
         else:
             action, self._state = self._policy(self._params, observation,
                                                self._state)
+            # if 'relaxed_onehot_categorical_head/~/linear' in self._params:
+            #     num_actions = np.prod(self._params['relaxed_onehot_categorical_head/~/linear']['b'].shape)
+            #     action = jax.nn.one_hot(action.argmax(), num_actions)
         return utils.to_numpy(action)

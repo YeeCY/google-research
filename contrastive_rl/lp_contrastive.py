@@ -268,7 +268,7 @@ def main(_):
     # use this mainly for debugging.
     if FLAGS.debug:
         params.update({
-            'min_replay_size': 10_000,
+            'min_replay_size': 2_000,
             'local': True,
             'jit': False,
             'num_sgd_steps_per_step': 1,

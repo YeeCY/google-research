@@ -26,6 +26,7 @@ import gym
 import metaworld
 import numpy as np
 import point_env
+import gridworld_env
 
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
@@ -93,6 +94,9 @@ def load(env_name):
         CLASS = fetch_envs.FetchPushImage
         max_episode_steps = 50
         kwargs['rand_y'] = True
+    elif env_name == 'grid_world':
+        CLASS = gridworld_env.GridWorldEnv
+        max_episode_steps = 50
     elif env_name.startswith('ant_'):
         _, map_name = env_name.split('_')
         assert map_name in ['umaze', 'medium', 'large']

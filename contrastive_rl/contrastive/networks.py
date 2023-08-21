@@ -24,6 +24,10 @@ import numpy as np
 from acme.jax import networks as networks_lib
 from acme.jax import utils
 
+import tensorflow_probability
+tfp = tensorflow_probability.substrates.jax
+tfd = tfp.distributions
+
 
 @dataclasses.dataclass
 class ContrastiveNetworks:
@@ -34,6 +38,14 @@ class ContrastiveNetworks:
     repr_fn: Callable[Ellipsis, networks_lib.NetworkOutput]
     sample: networks_lib.SampleFn
     sample_eval: Optional[networks_lib.SampleFn] = None
+
+
+class RelaxedOnehotCategoricalHead(networks_lib.CategoricalHead):
+    def __call__(self, inputs: jnp.ndarray) -> tfd.Distribution:
+        logits = self._linear(inputs)
+        if not isinstance(self._logit_shape, int):
+            logits = hk.Reshape(self._logit_shape)(logits)
+        return tfd.RelaxedOneHotCategorical(temperature=1.0, logits=logits)
 
 
 def apply_policy_and_sample(
@@ -62,7 +74,7 @@ def make_networks(
         use_image_obs=False):
     """Creates networks used by the agent."""
 
-    num_dimensions = np.prod(spec.actions.shape, dtype=int)
+    num_dimensions = int(np.prod(spec.actions.shape))
     TORSO = networks_lib.AtariTorso  # pylint: disable=invalid-name
 
     def _unflatten_obs(obs):
@@ -201,16 +213,29 @@ def make_networks(
         if use_image_obs:
             state, goal = _unflatten_obs(obs)
             obs = jnp.concatenate([state, goal], axis=-1)
-            obs = TORSO()(obs)
+            obs = TORSO(obs)
+        # network = hk.Sequential([
+        #     hk.nets.MLP(
+        #         list(hidden_layer_sizes),
+        #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+        #         activation=jax.nn.relu,
+        #         activate_final=True),
+        #     networks_lib.NormalTanhDistribution(num_dimensions,
+        #                                         min_scale=actor_min_std),
+        # ])
         network = hk.Sequential([
             hk.nets.MLP(
                 list(hidden_layer_sizes),
                 w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
                 activation=jax.nn.relu,
                 activate_final=True),
-            networks_lib.NormalTanhDistribution(num_dimensions,
-                                                min_scale=actor_min_std),
+            # networks_lib.NormalTanhDistribution(num_dimensions,
+            #                                     min_scale=actor_min_std),
+            # jax.nn.softmax,
+            # networks_lib.DiscreteValued
+            RelaxedOnehotCategoricalHead(num_dimensions)
         ])
+
         return network(obs)
 
     policy = hk.without_apply_rng(hk.transform(_actor_fn))
@@ -244,6 +269,14 @@ def make_networks(
     #     sample=lambda params, key: params.sample(seed=key),
     #     sample_eval=lambda params, key: params.mode(),
     # )
+
+    def sample_eval(params, key):
+        logits = params.logits
+        action = logits.argmax(axis=-1)
+        action = jax.nn.one_hot(action, num_dimensions)
+
+        return action
+
     return ContrastiveNetworks(
         policy_network=networks_lib.FeedForwardNetwork(
             lambda key: policy.init(key, dummy_obs_and_goal), policy.apply
@@ -255,5 +288,6 @@ def make_networks(
         repr_fn=repr_fn.apply,
         log_prob=lambda params, actions: params.log_prob(actions),
         sample=lambda params, key: params.sample(seed=key),
-        sample_eval=lambda params, key: params.mode(),
+        # sample_eval=lambda params, key: params.mode(),
+        sample_eval=sample_eval,
     )
