@@ -139,7 +139,7 @@ class ContrastiveLearner(acme.Learner):
             #     q_params, s, g, next_s)
             # pos_logits = jnp.einsum('ijkl,ik->ijl', logits, transitions.action)
             logits = networks.q_network.apply(
-                q_params, s, next_s, next_s)
+                q_params, s, g, next_s)
             pos_logits = jnp.einsum('ijk,ij->ik', logits, transitions.action)
 
             if config.use_td:
@@ -156,7 +156,7 @@ class ContrastiveLearner(acme.Learner):
                 # transitions = transitions._replace(
                 #     next_observation=jnp.concatenate([next_s, g], axis=1))
                 next_dist_params = networks.policy_network.apply(
-                    policy_params, jnp.concatenate([next_s, rand_g], axis=1))
+                    policy_params, jnp.concatenate([next_s, g], axis=1))
                 c = next_dist_params.cumsum(axis=1)
                 u = jax.random.uniform(key, shape=(len(c), 1))
                 next_action = (u < c).argmax(axis=1)
@@ -172,7 +172,7 @@ class ContrastiveLearner(acme.Learner):
                 #                                   hard_next_action,
                 #                                   g, g)  # This outputs logits.
                 next_q = networks.q_network.apply(target_q_params,
-                                                  next_s, rand_g, rand_g)
+                                                  next_s, g, rand_g)
 
                 # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
                 next_q = jax.nn.sigmoid(next_q)
@@ -195,7 +195,7 @@ class ContrastiveLearner(acme.Learner):
 
                 # neg_logits = logits[jnp.arange(batch_size), goal_indices]
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
-                neg_logits = networks.q_network.apply(q_params, s, rand_g, rand_g)
+                neg_logits = networks.q_network.apply(q_params, s, g, rand_g)
                 neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
                 # neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
                 loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(

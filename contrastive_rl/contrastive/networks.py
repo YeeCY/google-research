@@ -170,7 +170,7 @@ def make_networks(
 
         logit_encoder = hk.nets.MLP(
             list(hidden_layer_sizes) + [num_dimensions],
-            w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+            # w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='logit_encoder')
         logits = logit_encoder(jnp.concatenate([state, goal, future_state], axis=-1))
@@ -233,7 +233,7 @@ def make_networks(
         network = hk.Sequential([
             hk.nets.MLP(
                 list(hidden_layer_sizes) + [num_dimensions],
-                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                # w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
                 activation=jax.nn.relu,
                 activate_final=False),
             # networks_lib.NormalTanhDistribution(num_dimensions,

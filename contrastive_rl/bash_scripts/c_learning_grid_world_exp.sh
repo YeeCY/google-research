@@ -19,7 +19,7 @@ export LOG_DIR="/projects/rsalakhugroup/chongyiz/contrastive_rl_logs"
 declare -a seeds=(0)
 
 for seed in "${seeds[@]}"; do
-  export CUDA_VISIBLE_DEVICES=$seed
+  export CUDA_VISIBLE_DEVICES=0,1,2,3
   export GPUS=3
   rm -rf $CONDA_PREFIX/lib/python*/site-packages/mujoco_py/generated/mujocopy-buildlock
   # shellcheck disable=SC2115
