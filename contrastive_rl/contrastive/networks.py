@@ -202,14 +202,14 @@ def make_networks(
         return sa_repr, g_repr, fs_repr, (state, goal, future_state)
 
     def _combine_repr(sa_repr, g_repr, fs_repr):
-        gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
+        # gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
         # we should use the goal representation together with the sa_repr
-        # g_repr = g_repr.transpose([0, 2, 1])
-        # sag_repr = jnp.einsum('ijk,ik->ij', g_repr, sa_repr)
+        g_repr = g_repr.transpose([0, 2, 1])
+        sag_repr = jnp.einsum('ijk,ik->ij', g_repr, sa_repr)
 
-        return jax.numpy.einsum('ik,jk->ij', sa_repr, gfs_repr)
+        # return jax.numpy.einsum('ik,jk->ij', sa_repr, gfs_repr)
         # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
-        # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
+        return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
 
     # def _critic_fn(obs, action):
     #     sa_repr, g_repr, hidden = _repr_fn(obs, action)
