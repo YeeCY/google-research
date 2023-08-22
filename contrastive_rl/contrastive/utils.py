@@ -287,8 +287,8 @@ class InitiallyRandomActor(actors.GenericActor):
                 action = jax.random.randint(
                     key=rng, shape=(), minval=0, maxval=num_actions)
                 action = jax.nn.one_hot(action, num_actions)
-            elif 'mlp/~/linear_2' in self._params:
-                num_actions = np.prod(self._params['mlp/~/linear_2']['b'].shape)
+            else:
+                num_actions = 5
                 rng, self._state = jax.random.split(self._state)
                 action = jax.random.randint(
                     key=rng, shape=(), minval=0, maxval=num_actions)
