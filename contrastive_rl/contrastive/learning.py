@@ -143,7 +143,7 @@ class ContrastiveLearner(acme.Learner):
                 q_params, s, transitions.action, next_s, next_s)
             # c-learning for arbitrary fs
             # pos_logits = networks.q_network.apply(
-            #     q_params, s, g, next_s)
+            #     q_params, s, transitions.action, g, next_s)
             # pos_logits = jnp.einsum('ijk,ij->ik', logits, transitions.action)
 
             if config.use_td:
@@ -185,7 +185,7 @@ class ContrastiveLearner(acme.Learner):
                                                   next_s, next_action, rand_g, rand_g)
                 # c-learning for arbitrary fs
                 # next_q = networks.q_network.apply(target_q_params,
-                #                                   next_s, g, rand_g)
+                #                                   next_s, next_action, g, rand_g)
 
                 # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
                 next_q = jax.nn.sigmoid(next_q)
@@ -211,7 +211,7 @@ class ContrastiveLearner(acme.Learner):
                 # c-learning
                 neg_logits = networks.q_network.apply(q_params, s, transitions.action, rand_g, rand_g)
                 # c-learning for arbitrary fs
-                # neg_logits = networks.q_network.apply(q_params, s, g, rand_g)
+                # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
                 # neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
                 # neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
                 loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
