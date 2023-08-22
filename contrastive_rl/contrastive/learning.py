@@ -191,7 +191,8 @@ class ContrastiveLearner(acme.Learner):
                                                   next_s, next_action, g, rand_g)
 
                 # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
-                next_q = jax.nn.sigmoid(next_q)
+                # next_q = jax.nn.sigmoid(next_q)
+                # next_v = jnp.min(next_q, axis=-1)
                 next_v = jnp.min(next_q, axis=-1)
                 next_v = jax.lax.stop_gradient(next_v)
                 # A_phi_psi
@@ -201,7 +202,8 @@ class ContrastiveLearner(acme.Learner):
                 # the predictions logits[range(B), goal_indices].
                 # So, the only thing that's meaningful for next_q is the diagonal. Off
                 # diagonal entries are meaningless and shouldn't be used.
-                w = next_v / (1 - next_v)
+                # w = next_v / (1 - next_v)
+                w = jnp.exp(next_v)
                 w_clipping = 20.0
                 w = jnp.clip(w, 0, w_clipping)
                 # w = jnp.einsum('ij,ij->i', w, next_action)
