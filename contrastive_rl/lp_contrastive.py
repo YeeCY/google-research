@@ -275,7 +275,7 @@ def main(_):
             'batch_size': 32,
             'max_number_of_steps': 10_000,
             'samples_per_insert_tolerance_rate': 1.0,
-            'hidden_layer_sizes': (512, 512, 512, 512),
+            'hidden_layer_sizes': (32, 32),
         })
 
     program = get_program(params)

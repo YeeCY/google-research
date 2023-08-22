@@ -33,8 +33,8 @@ class ContrastiveConfig:
 
     # Loss options
     batch_size: int = 256
-    actor_learning_rate: float = 1e-4
-    learning_rate: float = 1e-4
+    actor_learning_rate: float = 3e-5
+    learning_rate: float = 3e-5
     reward_scale: float = 1
     discount: float = 0.99
     n_step: int = 1

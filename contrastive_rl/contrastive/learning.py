@@ -148,7 +148,10 @@ class ContrastiveLearner(acme.Learner):
 
             if config.use_td:
                 # Make sure to use the twin Q trick.
-                assert len(pos_logits.shape) == 2
+                # predict logits
+                # assert len(pos_logits.shape) == 2
+                # A_phi_psi
+                assert len(pos_logits.shape) == 3
 
                 # We evaluate the next-state Q function using random goals
                 s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
@@ -191,7 +194,8 @@ class ContrastiveLearner(acme.Learner):
                 next_q = jax.nn.sigmoid(next_q)
                 next_v = jnp.min(next_q, axis=-1)
                 next_v = jax.lax.stop_gradient(next_v)
-                # next_v = jax.vmap(jnp.diag, -1, -1)(next_v)
+                # A_phi_psi
+                next_v = jnp.diag(next_v)
                 # diag(logits) are predictions for future states.
                 # diag(next_q) are predictions for random states, which correspond to
                 # the predictions logits[range(B), goal_indices].
@@ -202,7 +206,8 @@ class ContrastiveLearner(acme.Learner):
                 w = jnp.clip(w, 0, w_clipping)
                 # w = jnp.einsum('ij,ij->i', w, next_action)
                 # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
-                # pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
+                # A_phi_psi
+                pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
                 loss_pos = optax.sigmoid_binary_cross_entropy(
                     logits=pos_logits, labels=1)  # [B, 2]
 
@@ -212,8 +217,10 @@ class ContrastiveLearner(acme.Learner):
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, rand_g, rand_g)
                 # c-learning for arbitrary fs
                 neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
+
                 # neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
-                # neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
+                # A_phi_psi
+                neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
                 loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
                     logits=neg_logits, labels=1)  # [B, 2]
                 loss_neg2 = optax.sigmoid_binary_cross_entropy(
@@ -310,14 +317,20 @@ class ContrastiveLearner(acme.Learner):
                 #     q_params, new_state, hard_action, new_goal, new_goal)
                 q_action = networks.q_network.apply(
                     q_params, new_state, action, new_goal, new_goal)
-                if len(q_action.shape) == 2:  # twin q trick
+                # predict logits
+                # if len(q_action.shape) == 2:  # twin q trick
+                # A_phi_psi
+                if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[-1] == 2
                     q_action = jnp.min(q_action, axis=-1)
                 # actor_loss = alpha * log_prob - jnp.diag(q_action)
                 # q_action = jnp.sum(q_action * action_dist, axis=-1)
                 # q_action = jnp.einsum('ij,ij->i', q_action, action)
                 # actor_loss = -jnp.diag(q_action)
-                actor_loss = -q_action
+                # predict logits
+                # actor_loss = -q_action
+                # A_phi_psi
+                actor_loss = -jnp.diag(q_action)
 
                 assert 0.0 <= config.bc_coef <= 1.0
                 if config.bc_coef > 0:
