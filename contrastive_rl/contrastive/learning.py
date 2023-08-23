@@ -79,7 +79,7 @@ class ContrastiveLearner(acme.Learner):
             # alpha is the temperature parameter that determines the relative
             # importance of the entropy term versus the reward.
             log_alpha = jnp.asarray(0., dtype=jnp.float32)
-            alpha_optimizer = optax.adam(learning_rate=3e-4)
+            alpha_optimizer = optax.adam(learning_rate=config.actor_learning_rate, eps=1e-7)
             alpha_optimizer_state = alpha_optimizer.init(log_alpha)
         else:
             if config.target_entropy:
@@ -168,10 +168,16 @@ class ContrastiveLearner(acme.Learner):
                 # c-learning for arbitrary fs
                 next_dist_params = networks.policy_network.apply(
                     policy_params, jnp.concatenate([next_s, g], axis=1))
-                c = next_dist_params.cumsum(axis=1)
-                u = jax.random.uniform(key, shape=(len(c), 1))
-                next_action = (u < c).argmax(axis=1)
-                next_action = jax.nn.one_hot(next_action, 5)
+
+                # discrete environment
+                # c = next_dist_params.cumsum(axis=1)
+                # u = jax.random.uniform(key, shape=(len(c), 1))
+                # next_a = (u < c).argmax(axis=1)
+                # next_a = jax.nn.one_hot(next_a, 5)
+
+                # continuous environment
+                next_a = networks.sample(next_dist_params, key)
+
                 # next_action = networks.sample(next_dist_params, key)
                 # index = next_action.argmax(axis=-1)
                 # hard_next_action = jax.nn.one_hot(index, 5)
@@ -188,7 +194,7 @@ class ContrastiveLearner(acme.Learner):
                 #                                   next_s, next_action, rand_g, rand_g)
                 # c-learning for arbitrary fs, TD-InfoNCE
                 next_q = networks.q_network.apply(target_q_params,
-                                                  next_s, next_action, g, rand_g)
+                                                  next_s, next_a, g, rand_g)
 
                 # # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
                 # # next_q = jax.nn.sigmoid(next_q)
@@ -220,8 +226,9 @@ class ContrastiveLearner(acme.Learner):
                 #     logits=pos_logits, labels=1)  # [B, 2]
 
                 # TD-InfoNCE
+                I = I[:, :, None].repeat(pos_logits.shape[-1], axis=-1)
                 loss_pos = jax.vmap(optax.softmax_cross_entropy, -1, -1)(
-                    pos_logits, I[:, :, None].repeat(pos_logits.shape[-1], axis=-1))
+                    pos_logits, I)
 
                 # neg_logits = logits[jnp.arange(batch_size), goal_indices]
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
@@ -320,15 +327,21 @@ class ContrastiveLearner(acme.Learner):
                 batch_size = new_state.shape[0]
 
                 new_obs = jnp.concatenate([new_state, new_goal], axis=1)
-                action_dist = networks.policy_network.apply(
+                dist_params = networks.policy_network.apply(
                     policy_params, new_obs)
-                c = action_dist.cumsum(axis=1)
-                u = jax.random.uniform(key, shape=(len(c), 1))
-                hard_action = (u < c).argmax(axis=1)
-                hard_action = jax.nn.one_hot(hard_action, 5)
-                action = hard_action - jax.lax.stop_gradient(action_dist) + action_dist  # propagate gradient
+
+                # discrete environment
+                # c = dist_params.cumsum(axis=1)
+                # u = jax.random.uniform(key, shape=(len(c), 1))
+                # hard_action = (u < c).argmax(axis=1)
+                # hard_action = jax.nn.one_hot(hard_action, 5)
+                # action = hard_action - jax.lax.stop_gradient(dist_params) + dist_params  # propagate gradient
+
+                # continuous environment
+                action = networks.sample(dist_params, key)
+                log_prob = networks.log_prob(dist_params, action)
+
                 # action_dist = networks.sample(dist_params, key)
-                # log_prob = networks.log_prob(dist_params, action)
                 # index = action.argmax(axis=-1)
                 # hard_action = jax.nn.one_hot(index, 5)
                 # hard_action = hard_action - jax.lax.stop_gradient(action) + action
@@ -355,7 +368,7 @@ class ContrastiveLearner(acme.Learner):
 
                 # TD-InfoNCE
                 I = jnp.eye(batch_size)
-                actor_loss = optax.softmax_cross_entropy(logits=q_action, labels=I)  # (B, num_actions)
+                actor_loss = alpha * log_prob + optax.softmax_cross_entropy(logits=q_action, labels=I)  # (B, num_actions)
 
                 assert 0.0 <= config.bc_coef <= 1.0
                 if config.bc_coef > 0:

@@ -30,8 +30,12 @@ import tensorflow as tf
 
 from absl import app
 from absl import flags
+from acme.specs import make_environment_spec
+
 import contrastive
 from contrastive import utils as contrastive_utils
+from contrastive.config import target_entropy_from_env_spec
+
 import launchpad as lp
 
 FLAGS = flags.FLAGS
@@ -87,6 +91,12 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
     env_factory_no_extra = lambda seed: env_factory(seed)[0]  # Remove obs_dim.
     environment, obs_dim = get_env(env_name, config.start_index,
                                    config.end_index)
+
+    env_spec = make_environment_spec(environment)
+    target_entropy = target_entropy_from_env_spec(env_spec)
+    if config.entropy_coefficient is None:
+        config.target_entropy = target_entropy
+
     assert (environment.action_spec().minimum == -1).all()
     assert (environment.action_spec().maximum == 1).all()
     config.obs_dim = obs_dim
@@ -144,7 +154,7 @@ def main(_):
     params = {
         'seed': FLAGS.seed,
         'use_random_actor': True,
-        'entropy_coefficient': None if 'image' in env_name else 0.0,
+        'entropy_coefficient': None if 'image' in env_name else 0.05,
         'env_name': env_name,
         # default max_number_of_steps = 1_000_000, 15625 for 1M gradient steps in total
         'max_number_of_steps': FLAGS.max_number_of_steps,

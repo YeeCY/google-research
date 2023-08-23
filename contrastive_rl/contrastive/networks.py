@@ -251,18 +251,27 @@ def make_networks(
         #     networks_lib.NormalTanhDistribution(num_dimensions,
         #                                         min_scale=actor_min_std),
         # ])
+        # network = hk.Sequential([
+        #     hk.nets.MLP(
+        #         list(hidden_layer_sizes) + [num_dimensions],
+        #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+        #         activation=jax.nn.relu,
+        #         activate_final=False),
+        #     # networks_lib.NormalTanhDistribution(num_dimensions,
+        #     #                                     min_scale=actor_min_std),
+        #     # jax.nn.softmax,
+        #     # networks_lib.DiscreteValued
+        #     # RelaxedOnehotCategoricalHead(num_dimensions)
+        #     jax.nn.softmax,
+        # ])
         network = hk.Sequential([
             hk.nets.MLP(
-                list(hidden_layer_sizes) + [num_dimensions],
+                list(hidden_layer_sizes),
                 w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
                 activation=jax.nn.relu,
-                activate_final=False),
-            # networks_lib.NormalTanhDistribution(num_dimensions,
-            #                                     min_scale=actor_min_std),
-            # jax.nn.softmax,
-            # networks_lib.DiscreteValued
-            # RelaxedOnehotCategoricalHead(num_dimensions)
-            jax.nn.softmax,
+                activate_final=True),
+            networks_lib.NormalTanhDistribution(num_dimensions,
+                                                min_scale=actor_min_std),
         ])
 
         return network(obs)
@@ -324,8 +333,8 @@ def make_networks(
         ),
         repr_fn=repr_fn.apply,
         log_prob=lambda params, actions: params.log_prob(actions),
-        # sample=lambda params, key: params.sample(seed=key),
-        sample=sample,
-        # sample_eval=lambda params, key: params.mode(),
-        sample_eval=sample_eval,
+        sample=lambda params, key: params.sample(seed=key),
+        # sample=sample,
+        sample_eval=lambda params, key: params.mode(),
+        # sample_eval=sample_eval,
     )

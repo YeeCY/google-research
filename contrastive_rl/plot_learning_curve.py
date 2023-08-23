@@ -131,8 +131,8 @@ def main(args):
     f, axes = plt.subplots(1, len(args.stats))
     if len(args.stats) == 1:
         axes = [axes]
-    f.set_figheight(8)
-    f.set_figwidth(8 * len(args.stats))
+    f.set_figheight(12)
+    f.set_figwidth(12 * len(args.stats))
 
     # read all data
     data = collect_data(root_exp_log_dir, args.stats, args.algos,

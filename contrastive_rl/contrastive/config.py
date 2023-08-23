@@ -33,8 +33,8 @@ class ContrastiveConfig:
 
     # Loss options
     batch_size: int = 256
-    actor_learning_rate: float = 3e-5
-    learning_rate: float = 3e-5
+    actor_learning_rate: float = 5e-5
+    learning_rate: float = 5e-5
     reward_scale: float = 1
     discount: float = 0.99
     n_step: int = 1
@@ -44,8 +44,9 @@ class ContrastiveConfig:
     target_entropy: float = 0.0
     # Target smoothing coefficient.
     # tau: float = 0.005
-    tau: float = 0.1
+    tau: float = 0.01
     hidden_layer_sizes: Tuple[int, ...] = (512, 512, 512, 512)
+    # hidden_layer_sizes: Tuple[int, ...] = (1024, 1024, 1024, 1024)
 
     # Replay options
     min_replay_size: int = 10000
