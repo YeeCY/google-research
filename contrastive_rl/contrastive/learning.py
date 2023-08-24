@@ -112,6 +112,7 @@ class ContrastiveLearner(acme.Learner):
             if config.use_td:
                 # For TD learning, the diagonal elements are the immediate next state.
                 s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
+                # g = jnp.roll(g, 1, axis=0)
                 next_s, _ = jnp.split(transitions.next_observation, [config.obs_dim],
                                       axis=1)
                 # if config.add_mc_to_td:
@@ -139,11 +140,11 @@ class ContrastiveLearner(acme.Learner):
             #     q_params, s, g, next_s)
             # pos_logits = jnp.einsum('ijkl,ik->ijl', logits, transitions.action)
             # c-learning
-            pos_logits = networks.q_network.apply(
-                q_params, s, transitions.action, next_s, next_s)
-            # c-learning for arbitrary fs, TD-InfoNCE
             # pos_logits = networks.q_network.apply(
-            #     q_params, s, transitions.action, g, next_s)
+            #     q_params, s, transitions.action, next_s, next_s)
+            # c-learning for arbitrary fs, TD-InfoNCE
+            pos_logits = networks.q_network.apply(
+                q_params, s, transitions.action, g, next_s)
             # pos_logits = jnp.einsum('ijk,ij->ik', logits, transitions.action)
 
             if config.use_td:
@@ -163,11 +164,11 @@ class ContrastiveLearner(acme.Learner):
                 # transitions = transitions._replace(
                 #     next_observation=jnp.concatenate([next_s, g], axis=1))
                 # c-learning
-                next_dist_params = networks.policy_network.apply(
-                    policy_params, jnp.concatenate([next_s, rand_g], axis=1))
-                # c-learning for arbitrary fs
                 # next_dist_params = networks.policy_network.apply(
-                #     policy_params, jnp.concatenate([next_s, g], axis=1))
+                #     policy_params, jnp.concatenate([next_s, rand_g], axis=1))
+                # c-learning for arbitrary fs
+                next_dist_params = networks.policy_network.apply(
+                    policy_params, jnp.concatenate([next_s, g], axis=1))
 
                 # discrete environment
                 # c = next_dist_params.cumsum(axis=1)
@@ -190,11 +191,11 @@ class ContrastiveLearner(acme.Learner):
                 #                                   hard_next_action,
                 #                                   g, g)  # This outputs logits.
                 # c-learning
-                next_q = networks.q_network.apply(target_q_params,
-                                                  next_s, next_a, rand_g, rand_g)
-                # c-learning for arbitrary fs, TD-InfoNCE
                 # next_q = networks.q_network.apply(target_q_params,
-                #                                   next_s, next_a, g, rand_g)
+                #                                   next_s, next_a, rand_g, rand_g)
+                # c-learning for arbitrary fs, TD-InfoNCE
+                next_q = networks.q_network.apply(target_q_params,
+                                                  next_s, next_a, g, rand_g)
 
                 # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
                 # next_q = jax.nn.sigmoid(next_q)
@@ -233,9 +234,9 @@ class ContrastiveLearner(acme.Learner):
                 # neg_logits = logits[jnp.arange(batch_size), goal_indices]
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
                 # c-learning
-                neg_logits = networks.q_network.apply(q_params, s, transitions.action, rand_g, rand_g)
+                # neg_logits = networks.q_network.apply(q_params, s, transitions.action, rand_g, rand_g)
                 # c-learning for arbitrary fs
-                # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
+                neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
 
                 # neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
                 # A_phi_psi
