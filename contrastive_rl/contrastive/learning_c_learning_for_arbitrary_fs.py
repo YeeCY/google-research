@@ -196,67 +196,67 @@ class ContrastiveLearner(acme.Learner):
                 next_q = networks.q_network.apply(target_q_params,
                                                   next_s, next_a, g, rand_g)
 
-                # # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
-                # # next_q = jax.nn.sigmoid(next_q)
-                # # next_v = jnp.min(next_q, axis=-1)
-                # next_q = jnp.min(next_q, axis=-1)
-                # next_q = jax.lax.stop_gradient(next_q)
-                # # A_phi_psi
-                # next_v = jnp.diag(next_q)
-                # # diag(logits) are predictions for future states.
-                # # diag(next_q) are predictions for random states, which correspond to
-                # # the predictions logits[range(B), goal_indices].
-                # # So, the only thing that's meaningful for next_q is the diagonal. Off
-                # # diagonal entries are meaningless and shouldn't be used.
-                # # w = next_v / (1 - next_v)
-                # w = jnp.exp(next_v)
-                # w_clipping = 20.0
-                # w = jnp.clip(w, 0, w_clipping)
-                # # w = jnp.einsum('ij,ij->i', w, next_action)
-                # # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
+                # next_q = networks.q_network.apply(target_q_params, next_s, next_action, rand_g, rand_g)
+                # next_q = jax.nn.sigmoid(next_q)
+                # next_v = jnp.min(next_q, axis=-1)
+                next_q = jnp.min(next_q, axis=-1)
+                next_q = jax.lax.stop_gradient(next_q)
+                # A_phi_psi
+                next_v = jnp.diag(next_q)
+                # diag(logits) are predictions for future states.
+                # diag(next_q) are predictions for random states, which correspond to
+                # the predictions logits[range(B), goal_indices].
+                # So, the only thing that's meaningful for next_q is the diagonal. Off
+                # diagonal entries are meaningless and shouldn't be used.
+                # w = next_v / (1 - next_v)
+                w = jnp.exp(next_v)
+                w_clipping = 20.0
+                w = jnp.clip(w, 0, w_clipping)
+                # w = jnp.einsum('ij,ij->i', w, next_action)
+                # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
 
                 # TD-InfoNCE w
-                next_v = jnp.min(next_q, axis=-1)
-                w = jax.nn.softmax(next_v, axis=1)
-                w = jax.lax.stop_gradient(w)  # (B, B)
+                # next_v = jnp.min(next_q, axis=-1)
+                # w = jax.nn.softmax(next_v, axis=1)
+                # w = jax.lax.stop_gradient(w)  # (B, B)
 
                 # A_phi_psi
-                # pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
-                # loss_pos = optax.sigmoid_binary_cross_entropy(
-                #     logits=pos_logits, labels=1)  # [B, 2]
+                pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
+                loss_pos = optax.sigmoid_binary_cross_entropy(
+                    logits=pos_logits, labels=1)  # [B, 2]
 
                 # TD-InfoNCE
-                I = I[:, :, None].repeat(pos_logits.shape[-1], axis=-1)
-                loss_pos = jax.vmap(optax.softmax_cross_entropy, -1, -1)(
-                    pos_logits, I)
+                # I = I[:, :, None].repeat(pos_logits.shape[-1], axis=-1)
+                # loss_pos = jax.vmap(optax.softmax_cross_entropy, -1, -1)(
+                #     pos_logits, I)
 
                 # neg_logits = logits[jnp.arange(batch_size), goal_indices]
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
                 # c-learning
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, rand_g, rand_g)
-                # c-learning for arbitrary fs, TD-InfoNCE
+                # c-learning for arbitrary fs
                 neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
 
-                # # neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
-                # # A_phi_psi
-                # neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
-                # loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
-                #     logits=neg_logits, labels=1)  # [B, 2]
-                # loss_neg2 = optax.sigmoid_binary_cross_entropy(
-                #     logits=neg_logits, labels=0)  # [B, 2]
-                #
-                # if config.add_mc_to_td:
-                #     loss = ((1 + (1 - config.discount)) * loss_pos
-                #             + config.discount * loss_neg1 + 2 * loss_neg2)
-                # else:
-                #     loss = ((1 - config.discount) * loss_pos
-                #             + config.discount * loss_neg1 + loss_neg2)
+                # neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
+                # A_phi_psi
+                neg_logits = jax.vmap(jnp.diag, -1, -1)(neg_logits)
+                loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
+                    logits=neg_logits, labels=1)  # [B, 2]
+                loss_neg2 = optax.sigmoid_binary_cross_entropy(
+                    logits=neg_logits, labels=0)  # [B, 2]
+
+                if config.add_mc_to_td:
+                    loss = ((1 + (1 - config.discount)) * loss_pos
+                            + config.discount * loss_neg1 + 2 * loss_neg2)
+                else:
+                    loss = ((1 - config.discount) * loss_pos
+                            + config.discount * loss_neg1 + loss_neg2)
 
                 # TD-InfoNCE loss
-                loss_neg = jax.vmap(optax.softmax_cross_entropy, -1, -1)(
-                    neg_logits, w[:, :, None].repeat(neg_logits.shape[-1], axis=-1))
+                # loss_neg = jax.vmap(optax.softmax_cross_entropy, -1, -1)(
+                #     neg_logits, w[:, :, None].repeat(neg_logits.shape[-1], axis=-1))
 
-                loss = (1 - config.discount) * loss_pos + config.discount * loss_neg
+                # loss = (1 - config.discount) * loss_pos + config.discount * loss_neg
 
                 # Take the mean here so that we can compute the accuracy.
                 # logits = jnp.mean(logits, axis=-1)
@@ -293,7 +293,7 @@ class ContrastiveLearner(acme.Learner):
                 'logits_neg': jnp.mean(neg_logits),
                 # 'logsumexp': logsumexp.mean(),
                 # 'w': jnp.mean(w),
-                'w': jnp.mean(w),
+                'w': jnp.mean(jnp.exp(next_q)),
             }
 
             return loss, metrics
@@ -366,11 +366,11 @@ class ContrastiveLearner(acme.Learner):
                 # predict logits
                 # actor_loss = -q_action
                 # A_phi_psi
-                # actor_loss = alpha * log_prob - jnp.diag(q_action)
+                actor_loss = alpha * log_prob - jnp.diag(q_action)
 
                 # TD-InfoNCE
-                I = jnp.eye(batch_size)
-                actor_loss = alpha * log_prob + optax.softmax_cross_entropy(logits=q_action, labels=I)  # (B, num_actions)
+                # I = jnp.eye(batch_size)
+                # actor_loss = alpha * log_prob + optax.softmax_cross_entropy(logits=q_action, labels=I)  # (B, num_actions)
 
                 assert 0.0 <= config.bc_coef <= 1.0
                 if config.bc_coef > 0:
