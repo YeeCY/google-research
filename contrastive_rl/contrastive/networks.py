@@ -244,8 +244,9 @@ def make_networks(
             w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
             activation=jax.nn.relu,
             name='g_encoder')
-        g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])
+        g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
         g_repr = jnp.triu(g_repr, k=1)
+        # https://pytorch.org/tutorials/intermediate/parametrizations.html#introduction-to-parametrizations
         # https://math.stackexchange.com/questions/2369940/parametric-representation-of-orthogonal-matrices
         g_repr = g_repr - g_repr.transpose([0, 2, 1])
         # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
