@@ -32,7 +32,7 @@ class ContrastiveConfig:
     steps_key: str = 'actor_steps'
 
     # Loss options
-    batch_size: int = 256
+    batch_size: int = 2048
     actor_learning_rate: float = 5e-5
     learning_rate: float = 5e-5
     reward_scale: float = 1
@@ -47,9 +47,11 @@ class ContrastiveConfig:
     # tau: float = 0.05
     tau: float = 0.005
     # hidden_layer_sizes: Tuple[int, ...] = (128, 256, 512, 256)
-    hidden_layer_sizes: Tuple[int, ...] = (512, 512, 512, 512)
+    # hidden_layer_sizes: Tuple[int, ...] = (512, 512, 512, 512)
+    hidden_layer_sizes: Tuple[int, ...] = (512, 512)
     # hidden_layer_sizes: Tuple[int, ...] = (1024, 1024, 1024, 1024)
     # hidden_layer_sizes: Tuple[int, ...] = (2048, 2048, 2048, 2048)
+    # hidden_layer_sizes: Tuple[int, ...] = (4096, 4096, 4096, 4096)
 
     # Replay options
     min_replay_size: int = 10000
