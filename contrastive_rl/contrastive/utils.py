@@ -288,11 +288,17 @@ class InitiallyRandomActor(actors.GenericActor):
                     key=rng, shape=(), minval=0, maxval=num_actions)
                 action = jax.nn.one_hot(action, num_actions)
             else:
+                # discrete
                 num_actions = 5
                 rng, self._state = jax.random.split(self._state)
                 action = jax.random.randint(
                     key=rng, shape=(), minval=0, maxval=num_actions)
                 action = jax.nn.one_hot(action, num_actions)
+
+                # continuous
+                # rng, self._state = jax.random.split(self._state)
+                # action = jax.random.uniform(key=rng, shape=(4,),
+                #                             minval=-1.0, maxval=1.0)
         else:
             action, self._state = self._policy(self._params, observation,
                                                self._state)

@@ -154,7 +154,7 @@ def main(_):
     params = {
         'seed': FLAGS.seed,
         'use_random_actor': True,
-        'entropy_coefficient': None if 'image' in env_name else 0.05,
+        'entropy_coefficient': None if 'image' in env_name else 0.0,
         'env_name': env_name,
         # default max_number_of_steps = 1_000_000, 15625 for 1M gradient steps in total
         'max_number_of_steps': FLAGS.max_number_of_steps,
