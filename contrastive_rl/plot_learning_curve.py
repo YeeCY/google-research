@@ -149,12 +149,15 @@ def main(args):
                 x = data[stats_field][algo][..., 0]
                 y = data[stats_field][algo][..., 1:]
 
-                # if stats_field in ['actor_loss',
-                #                    'behavioral_cloning_loss',
-                #                    'q_ratio',
-                #                    'q_pos_ratio',
-                #                    'q_neg_ratio']:
-                #     x, y = filter_outliers(x, y)
+                if stats_field in ['w',
+                                   'w_mean',
+                                   'logits_pos',
+                                   'logits_pos1',
+                                   'logits_pos2',
+                                   'logits_neg',
+                                   'logits_neg1',
+                                   'logits_neg2']:
+                    x, y = filter_outliers(x, y)
 
                 # mean = window_smooth(np.mean(y, axis=-1))
                 # std = window_smooth(np.std(y, axis=-1))

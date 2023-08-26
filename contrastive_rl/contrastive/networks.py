@@ -211,39 +211,131 @@ def make_networks(
     #             sa_repr = sa_repr / jnp.exp(log_scale)
     #     return sa_repr, g_repr, (state, goal)
 
-    def _repr_fn(obs, action, goal, future_obs, hidden=None):
+    # def _repr_fn(obs, action, goal, future_obs, hidden=None):
+    #     # The optional input hidden is the image representations. We include this
+    #     # as an input for the second Q value when twin_q = True, so that the two Q
+    #     # values use the same underlying image representation.
+    #     if hidden is None:
+    #         if use_image_obs:
+    #             obs = _unflatten_img(obs)
+    #             goal = _unflatten_img(goal)
+    #             future_obs = _unflatten_img(future_obs)
+    #             img_encoder = TORSO()
+    #             state = img_encoder(obs)
+    #             goal = img_encoder(goal)
+    #             future_state = img_encoder(future_obs)
+    #         else:
+    #             state = obs
+    #             goal = goal
+    #             future_state = future_obs
+    #     else:
+    #         # this line of code should match the return values!
+    #         state, goal, future_state = hidden
+    #
+    #     sa_encoder = hk.nets.MLP(
+    #         list(hidden_layer_sizes) + [repr_dim],
+    #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #         activation=jax.nn.relu,
+    #         name='sa_encoder')
+    #     sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
+    #
+    #     g_encoder = hk.nets.MLP(
+    #         list(hidden_layer_sizes) + [repr_dim * repr_dim],
+    #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #         activation=jax.nn.relu,
+    #         name='g_encoder')
+    #     g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
+    #     g_repr = jnp.triu(g_repr, k=1)
+    #     # https://pytorch.org/tutorials/intermediate/parametrizations.html#introduction-to-parametrizations
+    #     # https://math.stackexchange.com/questions/2369940/parametric-representation-of-orthogonal-matrices
+    #     g_repr = g_repr - g_repr.transpose([0, 2, 1])
+    #     # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
+    #     g_repr = jnp.exp(g_repr)
+    #
+    #     fs_encoder = hk.nets.MLP(
+    #         list(hidden_layer_sizes) + [repr_dim],
+    #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #         activation=jax.nn.relu,
+    #         name='fs_encoder')
+    #     fs_repr = fs_encoder(future_state)
+    #
+    #     # sag_encoder = hk.nets.MLP(
+    #     #     list(hidden_layer_sizes) + [repr_dim],
+    #     #     w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #     #     activation=jax.nn.relu,
+    #     #     name='sa_encoder')
+    #     # sag_repr = sag_encoder(jnp.concatenate([state, action, goal], axis=-1))
+    #     #
+    #     # fs_encoder = hk.nets.MLP(
+    #     #     list(hidden_layer_sizes) + [repr_dim],
+    #     #     w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #     #     activation=jax.nn.relu,
+    #     #     name='fs_encoder')
+    #     # fs_repr = fs_encoder(future_state)
+    #
+    #     # logit_encoder = hk.nets.MLP(
+    #     #     list(hidden_layer_sizes) + [1],
+    #     #     w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+    #     #     activation=jax.nn.relu,
+    #     #     name='logit_encoder')
+    #     # logits = logit_encoder(jnp.concatenate([state, action, goal, future_state], axis=-1))
+    #
+    #     if repr_norm:
+    #         sag_repr = sag_repr / jnp.linalg.norm(sag_repr, axis=1, keepdims=True)
+    #         fs_repr = fs_repr / jnp.linalg.norm(fs_repr, axis=1, keepdims=True)
+    #
+    #         if repr_norm_temp:
+    #             log_scale = hk.get_parameter('repr_log_scale', [], dtype=sag_repr.dtype,
+    #                                          init=jnp.zeros)
+    #             sag_repr = sag_repr / jnp.exp(log_scale)
+    #
+    #     # return sa_repr, g_repr, fs_repr, (state, goal, future_state)
+    #     return sa_repr, g_repr, fs_repr, (state, goal, future_state)
+    #     # return sag_repr, fs_repr, (state, goal, future_state)
+
+    def _repr_fn(obs, action, goal, future_obs):
         # The optional input hidden is the image representations. We include this
         # as an input for the second Q value when twin_q = True, so that the two Q
         # values use the same underlying image representation.
-        if hidden is None:
-            if use_image_obs:
-                obs = _unflatten_img(obs)
-                goal = _unflatten_img(goal)
-                future_obs = _unflatten_img(future_obs)
-                img_encoder = TORSO()
-                state = img_encoder(obs)
-                goal = img_encoder(goal)
-                future_state = img_encoder(future_obs)
-            else:
-                state = obs
-                goal = goal
-                future_state = future_obs
+        if use_image_obs:
+            obs = _unflatten_img(obs)
+            goal = _unflatten_img(goal)
+            future_obs = _unflatten_img(future_obs)
+            img_encoder = TORSO()
+            state = img_encoder(obs)
+            goal = img_encoder(goal)
+            future_state = img_encoder(future_obs)
         else:
-            # this line of code should match the return values!
-            state, goal, future_state = hidden
+            state = obs
+            goal = goal
+            future_state = future_obs
 
-        sa_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim],
-            w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
-            activation=jax.nn.relu,
-            name='sa_encoder')
-        sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
+        sa_encoder = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes) + [repr_dim],
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                name='sa_encoder'),
+        ])
+        sa_repr = sa_encoder(jnp.concatenate([state, action, goal], axis=-1))
 
-        g_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim * repr_dim],
-            w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
-            activation=jax.nn.relu,
-            name='g_encoder')
+        sa_encoder2 = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes) + [repr_dim],
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                name='sa_encoder2'),
+        ])
+        sa_repr2 = sa_encoder2(jnp.concatenate([state, action, goal], axis=-1))
+        sa_repr = jnp.stack([sa_repr, sa_repr2], axis=-1)
+
+        g_encoder = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes) + [repr_dim * repr_dim],
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                name='g_encoder'),
+        ])
         g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
         g_repr = jnp.triu(g_repr, k=1)
         # https://pytorch.org/tutorials/intermediate/parametrizations.html#introduction-to-parametrizations
@@ -252,12 +344,38 @@ def make_networks(
         # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
         g_repr = jnp.exp(g_repr)
 
-        fs_encoder = hk.nets.MLP(
-            list(hidden_layer_sizes) + [repr_dim],
-            w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
-            activation=jax.nn.relu,
-            name='fs_encoder')
+        g_encoder2 = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes) + [repr_dim * repr_dim],
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                name='g_encoder2'),
+        ])
+        g_repr2 = g_encoder2(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
+        g_repr2 = jnp.triu(g_repr2, k=1)
+        g_repr2 = g_repr2 - g_repr2.transpose([0, 2, 1])
+        # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
+        g_repr2 = jnp.exp(g_repr2)
+        g_repr = jnp.stack([g_repr, g_repr2], axis=-1)
+
+        fs_encoder = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes) + [repr_dim],
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                name='fs_encoder'),
+        ])
         fs_repr = fs_encoder(future_state)
+
+        fs_encoder2 = hk.Sequential([
+            hk.nets.MLP(
+                list(hidden_layer_sizes) + [repr_dim],
+                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+                activation=jax.nn.relu,
+                name='fs_encoder2'),
+        ])
+        fs_repr2 = fs_encoder2(future_state)
+        fs_repr = jnp.stack([fs_repr, fs_repr2], axis=-1)
 
         # sag_encoder = hk.nets.MLP(
         #     list(hidden_layer_sizes) + [repr_dim],
@@ -281,29 +399,42 @@ def make_networks(
         # logits = logit_encoder(jnp.concatenate([state, action, goal, future_state], axis=-1))
 
         if repr_norm:
-            sag_repr = sag_repr / jnp.linalg.norm(sag_repr, axis=1, keepdims=True)
+            sa_repr = sa_repr / jnp.linalg.norm(sa_repr, axis=1, keepdims=True)
             fs_repr = fs_repr / jnp.linalg.norm(fs_repr, axis=1, keepdims=True)
 
             if repr_norm_temp:
-                log_scale = hk.get_parameter('repr_log_scale', [], dtype=sag_repr.dtype,
+                log_scale = hk.get_parameter('repr_log_scale', [], dtype=sa_repr.dtype,
                                              init=jnp.zeros)
-                sag_repr = sag_repr / jnp.exp(log_scale)
+                sa_repr = sa_repr / jnp.exp(log_scale)
 
         # return sa_repr, g_repr, fs_repr, (state, goal, future_state)
-        return sa_repr, g_repr, fs_repr, (state, goal, future_state)
+        return sa_repr, g_repr, fs_repr
         # return sag_repr, fs_repr, (state, goal, future_state)
+
+    # def _combine_repr(sa_repr, g_repr, fs_repr):
+    #     # def _combine_repr(sag_repr, fs_repr):
+    #     # gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
+    #     # we should use the goal representation together with the sa_repr
+    #     g_repr = g_repr.transpose([0, 2, 1])
+    #     sag_repr = jnp.einsum('ijk,ik->ij', g_repr, sa_repr)
+    #
+    #     # return jax.numpy.einsum('ik,jk->ij', sa_repr, gfs_repr)
+    #     # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
+    #     # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
+    #     return jnp.einsum('ik,jk->ij', sag_repr, fs_repr)
 
     def _combine_repr(sa_repr, g_repr, fs_repr):
         # def _combine_repr(sag_repr, fs_repr):
         # gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
         # we should use the goal representation together with the sa_repr
-        g_repr = g_repr.transpose([0, 2, 1])
-        sag_repr = jnp.einsum('ijk,ik->ij', g_repr, sa_repr)
+        # g_repr = g_repr.transpose([0, 2, 1, 3])
+        # sag_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, sa_repr)
 
         # return jax.numpy.einsum('ik,jk->ij', sa_repr, gfs_repr)
         # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
         # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
-        return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
+        # return jnp.einsum('ikl,jkl->ijl', sag_repr, fs_repr)
+        return jnp.einsum('ikl,jkl->ijl', sa_repr, fs_repr)
 
     # def _critic_fn(obs, action):
     #     sa_repr, g_repr, hidden = _repr_fn(obs, action)
@@ -315,24 +446,32 @@ def make_networks(
     #         outer = jnp.stack([outer, outer2], axis=-1)
     #     return outer
 
+    # def _critic_fn(obs, action, goal, future_obs):
+    #     # logits, hidden = _repr_fn(obs, action, goal, future_obs)
+    #     sa_repr, g_repr, fs_repr, hidden = _repr_fn(obs, action, goal, future_obs)
+    #     # sag_repr, fs_repr, hidden = _repr_fn(obs, action, goal, future_obs)
+    #     outer = _combine_repr(sa_repr, g_repr, fs_repr)
+    #     # outer = _combine_repr(sag_repr, fs_repr)
+    #     if twin_q:
+    #         # logits2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
+    #         sa_repr2, g_repr2, fs_repr2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
+    #         # sag_repr2, fs_repr2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
+    #         outer2 = _combine_repr(sa_repr2, g_repr2, fs_repr2)
+    #         # outer2 = _combine_repr(sag_repr2, fs_repr2)
+    #         # outer.shape = [batch_size, batch_size, 2]
+    #         # logits = jnp.concatenate([logits, logits2], axis=-1)
+    #         outer = jnp.stack([outer, outer2], axis=-1)
+    #     else:
+    #         outer = outer[:, :, None]
+    #     # return logits
+    #     return outer
+
     def _critic_fn(obs, action, goal, future_obs):
+        assert twin_q
         # logits, hidden = _repr_fn(obs, action, goal, future_obs)
-        sa_repr, g_repr, fs_repr, hidden = _repr_fn(obs, action, goal, future_obs)
-        # sag_repr, fs_repr, hidden = _repr_fn(obs, action, goal, future_obs)
+        sa_repr, g_repr, fs_repr = _repr_fn(
+            obs, action, goal, future_obs)
         outer = _combine_repr(sa_repr, g_repr, fs_repr)
-        # outer = _combine_repr(sag_repr, fs_repr)
-        if twin_q:
-            # logits2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
-            sa_repr2, g_repr2, fs_repr2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
-            # sag_repr2, fs_repr2, _ = _repr_fn(obs, action, goal, future_obs, hidden=hidden)
-            outer2 = _combine_repr(sa_repr2, g_repr2, fs_repr2)
-            # outer2 = _combine_repr(sag_repr2, fs_repr2)
-            # outer.shape = [batch_size, batch_size, 2]
-            # logits = jnp.concatenate([logits, logits2], axis=-1)
-            outer = jnp.stack([outer, outer2], axis=-1)
-        else:
-            outer = outer[:, :, None]
-        # return logits
         return outer
 
     def _actor_fn(obs):
@@ -393,11 +532,11 @@ def make_networks(
     # dummy_action = utils.add_batch_dim(dummy_action)
     # dummy_obs = utils.add_batch_dim(dummy_obs)
 
-    dummy_action = utils.ones_like(spec.actions)
-    dummy_obs = utils.ones_like(spec.observations)[:obs_dim]
-    dummy_future_obs = utils.ones_like(spec.observations)[:obs_dim]
-    dummy_goal = utils.ones_like(spec.observations)[obs_dim:]
-    dummy_obs_and_goal = utils.ones_like(spec.observations)
+    dummy_action = utils.zeros_like(spec.actions)
+    dummy_obs = utils.zeros_like(spec.observations)[:obs_dim]
+    dummy_future_obs = utils.zeros_like(spec.observations)[:obs_dim]
+    dummy_goal = utils.zeros_like(spec.observations)[obs_dim:]
+    dummy_obs_and_goal = utils.zeros_like(spec.observations)
     dummy_action = utils.add_batch_dim(dummy_action)
     dummy_obs = utils.add_batch_dim(dummy_obs)
     dummy_future_obs = utils.add_batch_dim(dummy_future_obs)
