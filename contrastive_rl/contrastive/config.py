@@ -48,7 +48,7 @@ class ContrastiveConfig:
     tau: float = 0.005
     # hidden_layer_sizes: Tuple[int, ...] = (128, 256, 512, 256)
     hidden_layer_sizes: Tuple[int, ...] = (512, 512, 512, 512)
-    # hidden_layer_sizes: Tuple[int, ...] = (512, 512)
+    # hidden_layer_sizes: Tuple[int, ...] = (256, 256)
     # hidden_layer_sizes: Tuple[int, ...] = (1024, 1024, 1024, 1024)
     # hidden_layer_sizes: Tuple[int, ...] = (2048, 2048, 2048, 2048)
     # hidden_layer_sizes: Tuple[int, ...] = (4096, 4096, 4096, 4096)
