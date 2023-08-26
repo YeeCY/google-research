@@ -232,7 +232,8 @@ def make_networks(
                 activation=jax.nn.relu,
                 name='sa_encoder'),
         ])
-        sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
+        sa_repr = sa_encoder(jnp.concatenate([state, action, goal], axis=-1))
+        # sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
 
         sa_encoder2 = hk.Sequential([
             hk.nets.MLP(
@@ -241,37 +242,39 @@ def make_networks(
                 activation=jax.nn.relu,
                 name='sa_encoder2'),
         ])
-        sa_repr2 = sa_encoder2(jnp.concatenate([state, action], axis=-1))
+        sa_repr2 = sa_encoder2(jnp.concatenate([state, action, goal], axis=-1))
+        # sa_repr2 = sa_encoder2(jnp.concatenate([state, action], axis=-1))
         sa_repr = jnp.stack([sa_repr, sa_repr2], axis=-1)
 
-        g_encoder = hk.Sequential([
-            hk.nets.MLP(
-                list(hidden_layer_sizes) + [repr_dim * repr_dim],
-                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
-                activation=jax.nn.relu,
-                name='g_encoder'),
-        ])
-        g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
-        g_repr = jnp.triu(g_repr, k=1)
-        # https://pytorch.org/tutorials/intermediate/parametrizations.html#introduction-to-parametrizations
-        # https://math.stackexchange.com/questions/2369940/parametric-representation-of-orthogonal-matrices
-        g_repr = g_repr - g_repr.transpose([0, 2, 1])
-        # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
-        g_repr = jnp.exp(g_repr)
-
-        g_encoder2 = hk.Sequential([
-            hk.nets.MLP(
-                list(hidden_layer_sizes) + [repr_dim * repr_dim],
-                w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
-                activation=jax.nn.relu,
-                name='g_encoder2'),
-        ])
-        g_repr2 = g_encoder2(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
-        g_repr2 = jnp.triu(g_repr2, k=1)
-        g_repr2 = g_repr2 - g_repr2.transpose([0, 2, 1])
-        # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
-        g_repr2 = jnp.exp(g_repr2)
-        g_repr = jnp.stack([g_repr, g_repr2], axis=-1)
+        # g_encoder = hk.Sequential([
+        #     hk.nets.MLP(
+        #         list(hidden_layer_sizes) + [repr_dim * repr_dim],
+        #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+        #         activation=jax.nn.relu,
+        #         name='g_encoder'),
+        # ])
+        # g_repr = g_encoder(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
+        # g_repr = jnp.triu(g_repr, k=1)
+        # # https://pytorch.org/tutorials/intermediate/parametrizations.html#introduction-to-parametrizations
+        # # https://math.stackexchange.com/questions/2369940/parametric-representation-of-orthogonal-matrices
+        # g_repr = g_repr - g_repr.transpose([0, 2, 1])
+        # # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
+        # g_repr = jnp.exp(g_repr)
+        #
+        # g_encoder2 = hk.Sequential([
+        #     hk.nets.MLP(
+        #         list(hidden_layer_sizes) + [repr_dim * repr_dim],
+        #         w_init=hk.initializers.VarianceScaling(1.0, 'fan_in', 'uniform'),
+        #         activation=jax.nn.relu,
+        #         name='g_encoder2'),
+        # ])
+        # g_repr2 = g_encoder2(goal).reshape([-1, repr_dim, repr_dim])  # only upper off-diagonal parameters are used
+        # g_repr2 = jnp.triu(g_repr2, k=1)
+        # g_repr2 = g_repr2 - g_repr2.transpose([0, 2, 1])
+        # # assert jnp.all(g_repr.transpose([0, 2, 1]) == -g_repr)
+        # g_repr2 = jnp.exp(g_repr2)
+        # g_repr = jnp.stack([g_repr, g_repr2], axis=-1)
+        g_repr = None
 
         fs_encoder = hk.Sequential([
             hk.nets.MLP(
@@ -314,8 +317,8 @@ def make_networks(
         # logits = logit_encoder(jnp.concatenate([state, action, goal, future_state], axis=-1))
 
         if repr_norm:
-            sa_repr = sa_repr / jnp.linalg.norm(sa_repr, axis=1, keepdims=True)
-            fs_repr = fs_repr / jnp.linalg.norm(fs_repr, axis=1, keepdims=True)
+            sa_repr = sa_repr / (jnp.linalg.norm(sa_repr, axis=1, keepdims=True) + 1e-8)
+            fs_repr = fs_repr / (jnp.linalg.norm(fs_repr, axis=1, keepdims=True) + 1e-8)
 
             if repr_norm_temp:
                 log_scale = hk.get_parameter('repr_log_scale', [], dtype=sa_repr.dtype,
@@ -342,14 +345,14 @@ def make_networks(
         # def _combine_repr(sag_repr, fs_repr):
         # gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
         # we should use the goal representation together with the sa_repr
-        g_repr = g_repr.transpose([0, 2, 1, 3])
-        sag_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, sa_repr)
+        # g_repr = g_repr.transpose([0, 2, 1, 3])
+        # sag_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, sa_repr)
 
         # return jnp.einsum('ik,jk->ij', sa_repr, gfs_repr)
-        return jnp.einsum('ik,jk->ij', sag_repr, fs_repr)
+        # return jnp.einsum('ik,jk->ij', sag_repr, fs_repr)
         # return jnp.einsum('ik,jk->ij', sag_repr, fs_repr)
         # return jnp.einsum('ikl,jkl->ijl', sag_repr, fs_repr)
-        # return jnp.einsum('ikl,jkl->ijl', sa_repr, fs_repr)
+        return jnp.einsum('ikl,jkl->ijl', sa_repr, fs_repr)
 
     # def _critic_fn(obs, action):
     #     sa_repr, g_repr, hidden = _repr_fn(obs, action)
