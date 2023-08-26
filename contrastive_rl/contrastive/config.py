@@ -33,8 +33,8 @@ class ContrastiveConfig:
 
     # Loss options
     batch_size: int = 256
-    actor_learning_rate: float = 5e-5
-    learning_rate: float = 5e-5
+    actor_learning_rate: float = 3e-4
+    learning_rate: float = 3e-4
     reward_scale: float = 1
     discount: float = 0.99
     n_step: int = 1
@@ -67,7 +67,7 @@ class ContrastiveConfig:
 
     repr_dim: Union[int, str] = 64  # Size of representation.
     use_random_actor: bool = True  # Initial with uniform random policy.
-    repr_norm: bool = False
+    repr_norm: bool = True
     use_cpc: bool = False
     local: bool = False  # Whether running locally. Disables eval.
     use_td: bool = False

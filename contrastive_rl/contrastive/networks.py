@@ -62,97 +62,12 @@ def apply_policy_and_sample(
     return apply_and_sample
 
 
-class SkipMLP(hk.Module):
-    """A multi-layer perceptron module with skip connection."""
-
-    def __init__(
-            self,
-            output_sizes: Iterable[int],
-            w_init: Optional[hk.initializers.Initializer] = None,
-            b_init: Optional[hk.initializers.Initializer] = None,
-            with_bias: bool = True,
-            activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
-            activate_final: bool = False,
-            name: Optional[str] = None,
-    ):
-        """Constructs an MLP.
-
-        Args:
-          output_sizes: Sequence of layer sizes.
-          w_init: Initializer for :class:`~haiku.Linear` weights.
-          b_init: Initializer for :class:`~haiku.Linear` bias. Must be ``None`` if
-            ``with_bias=False``.
-          with_bias: Whether or not to apply a bias in each layer.
-          activation: Activation function to apply between :class:`~haiku.Linear`
-            layers. Defaults to ReLU.
-          activate_final: Whether or not to activate the final layer of the MLP.
-          name: Optional name for this module.
-
-        Raises:
-          ValueError: If ``with_bias`` is ``False`` and ``b_init`` is not ``None``.
-        """
-        if not with_bias and b_init is not None:
-            raise ValueError("When with_bias=False b_init must not be set.")
-
-        super().__init__(name=name)
-        self.with_bias = with_bias
-        self.w_init = w_init
-        self.b_init = b_init
-        self.activation = activation
-        self.activate_final = activate_final
-        layers = []
-        output_sizes = tuple(output_sizes)
-        for index, output_size in enumerate(output_sizes):
-            layers.append(hk.Linear(output_size=output_size,
-                                    w_init=w_init,
-                                    b_init=b_init,
-                                    with_bias=with_bias,
-                                    name="linear_%d" % index))
-        self.layers = tuple(layers)
-        self.output_size = output_sizes[-1] if output_sizes else None
-
-    def __call__(
-            self,
-            inputs: jnp.ndarray,
-            dropout_rate: Optional[float] = None,
-            rng=None,
-    ) -> jnp.ndarray:
-        """Connects the module to some inputs.
-
-        Args:
-          inputs: A Tensor of shape ``[batch_size, input_size]``.
-          dropout_rate: Optional dropout rate.
-          rng: Optional RNG key. Require when using dropout.
-
-        Returns:
-          The output of the model of size ``[batch_size, output_size]``.
-        """
-        if dropout_rate is not None and rng is None:
-            raise ValueError("When using dropout an rng key must be passed.")
-        elif dropout_rate is None and rng is not None:
-            raise ValueError("RNG should only be passed when using dropout.")
-
-        rng = hk.PRNGSequence(rng) if rng is not None else None
-        num_layers = len(self.layers)
-
-        out = inputs
-        for i, layer in enumerate(self.layers):
-            out = layer(out) + out  # skip connection
-            if i < (num_layers - 1) or self.activate_final:
-                # Only perform dropout if we are activating the output.
-                if dropout_rate is not None:
-                    out = hk.dropout(next(rng), dropout_rate, out)
-                out = self.activation(out)
-
-        return out
-
-
 def make_networks(
         spec,
         obs_dim,
         repr_dim=64,
         repr_norm=False,
-        repr_norm_temp=True,
+        repr_norm_temp=False,
         hidden_layer_sizes=(256, 256),
         actor_min_std=1e-6,
         twin_q=False,
@@ -317,7 +232,7 @@ def make_networks(
                 activation=jax.nn.relu,
                 name='sa_encoder'),
         ])
-        sa_repr = sa_encoder(jnp.concatenate([state, action, goal], axis=-1))
+        sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
 
         sa_encoder2 = hk.Sequential([
             hk.nets.MLP(
@@ -326,7 +241,7 @@ def make_networks(
                 activation=jax.nn.relu,
                 name='sa_encoder2'),
         ])
-        sa_repr2 = sa_encoder2(jnp.concatenate([state, action, goal], axis=-1))
+        sa_repr2 = sa_encoder2(jnp.concatenate([state, action], axis=-1))
         sa_repr = jnp.stack([sa_repr, sa_repr2], axis=-1)
 
         g_encoder = hk.Sequential([
@@ -427,14 +342,14 @@ def make_networks(
         # def _combine_repr(sag_repr, fs_repr):
         # gfs_repr = jnp.einsum('ijk,ik->ij', g_repr, fs_repr)
         # we should use the goal representation together with the sa_repr
-        # g_repr = g_repr.transpose([0, 2, 1, 3])
-        # sag_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, sa_repr)
+        g_repr = g_repr.transpose([0, 2, 1, 3])
+        sag_repr = jnp.einsum('ijkl,ikl->ijl', g_repr, sa_repr)
 
-        # return jax.numpy.einsum('ik,jk->ij', sa_repr, gfs_repr)
-        # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
-        # return jax.numpy.einsum('ik,jk->ij', sag_repr, fs_repr)
+        # return jnp.einsum('ik,jk->ij', sa_repr, gfs_repr)
+        return jnp.einsum('ik,jk->ij', sag_repr, fs_repr)
+        # return jnp.einsum('ik,jk->ij', sag_repr, fs_repr)
         # return jnp.einsum('ikl,jkl->ijl', sag_repr, fs_repr)
-        return jnp.einsum('ikl,jkl->ijl', sa_repr, fs_repr)
+        # return jnp.einsum('ikl,jkl->ijl', sa_repr, fs_repr)
 
     # def _critic_fn(obs, action):
     #     sa_repr, g_repr, hidden = _repr_fn(obs, action)

@@ -18,6 +18,7 @@ import time
 from typing import NamedTuple, Optional
 
 import acme
+import numpy as np
 import jax
 import jax.numpy as jnp
 import optax
@@ -111,9 +112,11 @@ class ContrastiveLearner(acme.Learner):
             # avoids computing some of the underlying representations multiple times.
             if config.use_td:
                 # For TD learning, the diagonal elements are the immediate next state.
-                s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
+                # s, g = jnp.split(transitions.observation[:, 0], [config.obs_dim], axis=1)
+                s, _ = jnp.split(transitions.observation[:, 0], [config.obs_dim], axis=1)
+                g, _ = jnp.split(transitions.observation[:, 1], [config.obs_dim], axis=1)
                 # g = jnp.roll(g, 1, axis=0)
-                next_s, _ = jnp.split(transitions.next_observation, [config.obs_dim],
+                next_s, _ = jnp.split(transitions.next_observation[:, 0], [config.obs_dim],
                                       axis=1)
                 # if config.add_mc_to_td:
                 #     next_fraction = (1 - config.discount) / ((1 - config.discount) + 1)
@@ -144,7 +147,7 @@ class ContrastiveLearner(acme.Learner):
             #     q_params, s, transitions.action, next_s, next_s)
             # c-learning for arbitrary fs, TD-InfoNCE
             pos_logits = networks.q_network.apply(
-                q_params, s, transitions.action, g, next_s)
+                q_params, s, transitions.action[:, 0], g, next_s)
             # pos_logits = jnp.einsum('ijk,ij->ik', logits, transitions.action)
 
             if config.use_td:
@@ -155,12 +158,13 @@ class ContrastiveLearner(acme.Learner):
                 assert len(pos_logits.shape) == 3
 
                 # We evaluate the next-state Q function using random goals
-                s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
+                # s, g = jnp.split(transitions.observation, [config.obs_dim], axis=1)
                 # del s
-                next_s = transitions.next_observation[:, :config.obs_dim]
+                # next_s = transitions.next_observation[:, 0, :config.obs_dim]
                 goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
                 # rand_g = next_s[goal_indices]
                 rand_g = g[goal_indices]
+                # rand_g = transitions.observation[:, 1, :config.obs_dim]
                 # transitions = transitions._replace(
                 #     next_observation=jnp.concatenate([next_s, g], axis=1))
                 # c-learning
@@ -177,7 +181,8 @@ class ContrastiveLearner(acme.Learner):
                 # next_a = jax.nn.one_hot(next_a, 5)
 
                 # continuous environment
-                next_a = networks.sample(next_dist_params, key)
+                key, subkey = jax.random.split(key)
+                next_a = networks.sample(next_dist_params, subkey)
 
                 # next_action = networks.sample(next_dist_params, key)
                 # index = next_action.argmax(axis=-1)
@@ -238,7 +243,7 @@ class ContrastiveLearner(acme.Learner):
                 # c-learning
                 # neg_logits = networks.q_network.apply(q_params, s, transitions.action, rand_g, rand_g)
                 # c-learning for arbitrary fs, TD-InfoNCE
-                neg_logits = networks.q_network.apply(q_params, s, transitions.action, g, rand_g)
+                neg_logits = networks.q_network.apply(q_params, s, transitions.action[:, 0], g, rand_g)
 
                 # neg_logits = jnp.einsum('ijk,ij->ik', neg_logits, transitions.action)
                 # A_phi_psi
@@ -319,8 +324,11 @@ class ContrastiveLearner(acme.Learner):
                 log_prob = networks.log_prob(dist_params, transitions.action)
                 actor_loss = -1.0 * jnp.mean(log_prob)
             else:
-                state = obs[:, :config.obs_dim]
-                goal = obs[:, config.obs_dim:]
+                # state = obs[:, :config.obs_dim]
+                # goal = obs[:, config.obs_dim:]
+
+                state = obs[:, 0, :config.obs_dim]
+                goal = obs[:, 1, :config.obs_dim]
 
                 if config.random_goals == 0.0:
                     new_state = state
@@ -347,6 +355,7 @@ class ContrastiveLearner(acme.Learner):
                 # action = hard_action - jax.lax.stop_gradient(dist_params) + dist_params  # propagate gradient
 
                 # continuous environment
+                key, subkey = jax.random.split(key)
                 action = networks.sample(dist_params, key)
                 log_prob = networks.log_prob(dist_params, action)
 
@@ -521,7 +530,14 @@ class ContrastiveLearner(acme.Learner):
         with jax.profiler.StepTraceAnnotation('step', step_num=self._counter):
             sample = next(self._iterator)
             transitions = types.Transition(*sample.data)
-            self._state, metrics = self._update_step(self._state, transitions)
+
+            sample2 = next(self._iterator)
+            transitions2 = types.Transition(*sample2.data)
+
+            double_transitions = jax.tree_map(lambda x, y: np.stack([x, y], axis=1),
+                                              transitions, transitions2)
+
+            self._state, metrics = self._update_step(self._state, double_transitions)
 
         # Compute elapsed time.
         timestamp = time.time()
