@@ -92,6 +92,9 @@ class ContrastiveConfig:
     bc_coef: float = 0.0
     reverse_kl_coef: float = 0.0
 
+    use_arbitrary_func_reg: bool = True
+    arbitrary_func_reg_coef: float = 0.01
+
     # Parameters that should be overwritten, based on each environment.
     obs_dim: int = -1
     max_episode_steps: int = -1

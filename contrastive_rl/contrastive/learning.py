@@ -228,9 +228,13 @@ class ContrastiveLearner(acme.Learner):
 
                 # TD-InfoNCE w
                 next_v = jnp.min(next_q, axis=-1)
-                # w = jax.nn.softmax(next_v, axis=1)
-                w = batch_size * jax.nn.softmax(next_v, axis=1)
-                # w = jax.lax.stop_gradient(w)  # (B, B)
+                if config.use_arbitrary_func_reg:
+                    w = jnp.exp(next_v) / batch_size
+                    # w = jnp.exp(next_v)
+                else:
+                    w = jax.nn.softmax(next_v, axis=1)
+                    # w = batch_size * jax.nn.softmax(next_v, axis=1)
+                w = jax.lax.stop_gradient(w)  # (B, B)
 
                 # A_phi_psi
                 # pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
@@ -270,6 +274,14 @@ class ContrastiveLearner(acme.Learner):
 
                 loss = (1 - config.discount) * loss_pos + config.discount * loss_neg
 
+                if config.use_arbitrary_func_reg:
+                    # regularization
+                    reg = jnp.mean((jax.nn.logsumexp(neg_logits, axis=1) - jnp.log(batch_size)) ** 2)
+                    reg_loss = config.arbitrary_func_reg_coef * reg
+                    loss += jnp.mean(reg_loss)
+                else:
+                    reg_loss = 0.0
+
                 # Take the mean here so that we can compute the accuracy.
                 # logits = jnp.mean(logits, axis=-1)
 
@@ -302,8 +314,8 @@ class ContrastiveLearner(acme.Learner):
                 # 'binary_accuracy': jnp.mean((logits > 0) == I),
                 # 'categorical_accuracy': jnp.mean(correct),
                 'logits_pos': jnp.mean(jax.vmap(jnp.diag, -1, -1)(pos_logits)),
-                'logits_pos1': jnp.mean(jax.vmap(jnp.diag, -1, -1)(pos_logits[..., 0])),
-                'logits_pos2': jnp.mean(jax.vmap(jnp.diag, -1, -1)(pos_logits[..., 1])),
+                'logits_pos1': jnp.mean(jnp.diag(pos_logits[..., 0])),
+                'logits_pos2': jnp.mean(jnp.diag(pos_logits[..., 1])),
                 'logits_neg': jnp.mean(neg_logits),
                 'logits_neg1': jnp.mean(neg_logits[..., 0]),
                 'logits_neg2': jnp.mean(neg_logits[..., 1]),
@@ -312,6 +324,7 @@ class ContrastiveLearner(acme.Learner):
                 # 'w': jnp.mean(jnp.exp(next_q)),
                 'w': jnp.mean(jnp.diag(w)),
                 'w_mean': jnp.mean(w),
+                "reg_loss": jnp.mean(reg_loss),
             }
 
             return loss, metrics
@@ -391,8 +404,12 @@ class ContrastiveLearner(acme.Learner):
                 # actor_loss = alpha * log_prob - jnp.diag(q_action)
 
                 # TD-InfoNCE
-                I = jnp.eye(batch_size)
-                actor_loss = alpha * log_prob + optax.softmax_cross_entropy(logits=q_action, labels=I)  # (B, num_actions)
+                if config.use_arbitrary_func_reg:
+                    actor_q_loss = -jnp.diag(q_action)
+                else:
+                    I = jnp.eye(batch_size)
+                    actor_q_loss = optax.softmax_cross_entropy(logits=q_action, labels=I)
+                actor_loss = alpha * log_prob + actor_q_loss  # (B, num_actions)
 
                 assert 0.0 <= config.bc_coef <= 1.0
                 if config.bc_coef > 0:
