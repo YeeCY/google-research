@@ -73,9 +73,9 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
 
     if params.get('use_image_obs', False) and not params.get('local', False):
         print('WARNING: overwriting parameters for image-based tasks.')
-        params['num_sgd_steps_per_step'] = 16
-        params['prefetch_size'] = 16
-        params['num_actors'] = 10
+        params['num_sgd_steps_per_step'] = 8
+        params['prefetch_size'] = 8
+        params['num_actors'] = 8
 
     if env_name.startswith('offline_ant'):
         # No actors needed for the offline RL experiments. Evaluation is
@@ -106,7 +106,8 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
         config.max_episode_steps = 1000
     network_factory = functools.partial(
         contrastive.make_networks, obs_dim=obs_dim, repr_dim=config.repr_dim,
-        repr_norm=config.repr_norm, twin_q=config.twin_q,
+        repr_norm=config.repr_norm, repr_norm_temp=config.repr_norm_temp,
+        twin_q=config.twin_q,
         use_image_obs=config.use_image_obs,
         hidden_layer_sizes=config.hidden_layer_sizes)
 
@@ -154,7 +155,8 @@ def main(_):
     params = {
         'seed': FLAGS.seed,
         'use_random_actor': True,
-        'entropy_coefficient': None if 'image' in env_name else 0.0,
+        # 'entropy_coefficient': None if 'image' in env_name else 0.0,
+        'entropy_coefficient': 0.0,
         'env_name': env_name,
         # default max_number_of_steps = 1_000_000, 15625 for 1M gradient steps in total
         'max_number_of_steps': FLAGS.max_number_of_steps,

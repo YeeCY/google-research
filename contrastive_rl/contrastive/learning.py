@@ -92,8 +92,12 @@ class ContrastiveLearner(acme.Learner):
                        transitions,
                        key):
             """Eq 18 from https://arxiv.org/pdf/1812.05905.pdf."""
+
+            state = transitions.observation[:, 0, :config.obs_dim]
+            goal = transitions.observation[:, 1, :config.obs_dim]
+
             dist_params = networks.policy_network.apply(
-                policy_params, transitions.observation)
+                policy_params, jnp.concatenate([state, goal], axis=-1))
             action = networks.sample(dist_params, key)
             log_prob = networks.log_prob(dist_params, action)
             alpha = jnp.exp(log_alpha)
@@ -162,8 +166,8 @@ class ContrastiveLearner(acme.Learner):
                 # del s
                 # next_s = transitions.next_observation[:, 0, :config.obs_dim]
                 goal_indices = jnp.roll(jnp.arange(batch_size, dtype=jnp.int32), -1)
-                # rand_g = next_s[goal_indices]
                 rand_g = g[goal_indices]
+                # rand_g, _ = jnp.split(transitions.observation[:, 2], [config.obs_dim], axis=1)
                 # rand_g = transitions.observation[:, 1, :config.obs_dim]
                 # transitions = transitions._replace(
                 #     next_observation=jnp.concatenate([next_s, g], axis=1))
@@ -181,8 +185,8 @@ class ContrastiveLearner(acme.Learner):
                 # next_a = jax.nn.one_hot(next_a, 5)
 
                 # continuous environment
-                key, subkey = jax.random.split(key)
-                next_a = networks.sample(next_dist_params, subkey)
+                # key, subkey = jax.random.split(key)
+                next_a = networks.sample(next_dist_params, key)
 
                 # next_action = networks.sample(next_dist_params, key)
                 # index = next_action.argmax(axis=-1)
@@ -224,9 +228,9 @@ class ContrastiveLearner(acme.Learner):
 
                 # TD-InfoNCE w
                 next_v = jnp.min(next_q, axis=-1)
-                w = jax.nn.softmax(next_v, axis=1)
-                # w = batch_size * jax.nn.softmax(next_v, axis=1)
-                w = jax.lax.stop_gradient(w)  # (B, B)
+                # w = jax.nn.softmax(next_v, axis=1)
+                w = batch_size * jax.nn.softmax(next_v, axis=1)
+                # w = jax.lax.stop_gradient(w)  # (B, B)
 
                 # A_phi_psi
                 # pos_logits = jax.vmap(jnp.diag, -1, -1)(pos_logits)
@@ -297,9 +301,9 @@ class ContrastiveLearner(acme.Learner):
             metrics = {
                 # 'binary_accuracy': jnp.mean((logits > 0) == I),
                 # 'categorical_accuracy': jnp.mean(correct),
-                'logits_pos': jnp.mean(pos_logits),
-                'logits_pos1': jnp.mean(pos_logits[..., 0]),
-                'logits_pos2': jnp.mean(pos_logits[..., 1]),
+                'logits_pos': jnp.mean(jax.vmap(jnp.diag, -1, -1)(pos_logits)),
+                'logits_pos1': jnp.mean(jax.vmap(jnp.diag, -1, -1)(pos_logits[..., 0])),
+                'logits_pos2': jnp.mean(jax.vmap(jnp.diag, -1, -1)(pos_logits[..., 1])),
                 'logits_neg': jnp.mean(neg_logits),
                 'logits_neg1': jnp.mean(neg_logits[..., 0]),
                 'logits_neg2': jnp.mean(neg_logits[..., 1]),
@@ -356,7 +360,7 @@ class ContrastiveLearner(acme.Learner):
                 # action = hard_action - jax.lax.stop_gradient(dist_params) + dist_params  # propagate gradient
 
                 # continuous environment
-                key, subkey = jax.random.split(key)
+                # key, subkey = jax.random.split(key)
                 action = networks.sample(dist_params, key)
                 log_prob = networks.log_prob(dist_params, action)
 
@@ -538,7 +542,14 @@ class ContrastiveLearner(acme.Learner):
             double_transitions = jax.tree_map(lambda x, y: np.stack([x, y], axis=1),
                                               transitions, transitions2)
 
+            # sample3 = next(self._iterator)
+            # transitions3 = types.Transition(*sample3.data)
+            #
+            # triple_transitions = jax.tree_map(lambda x, y, z: np.stack([x, y, z], axis=1),
+            #                                   transitions, transitions2, transitions3)
+
             self._state, metrics = self._update_step(self._state, double_transitions)
+            # self._state, metrics = self._update_step(self._state, triple_transitions)
 
         # Compute elapsed time.
         timestamp = time.time()
