@@ -92,10 +92,10 @@ def get_program(params: Dict[str, Any]) -> lp.Program:
     environment, obs_dim = get_env(env_name, config.start_index,
                                    config.end_index)
 
-    env_spec = make_environment_spec(environment)
-    target_entropy = target_entropy_from_env_spec(env_spec)
-    if config.entropy_coefficient is None:
-        config.target_entropy = target_entropy
+    # env_spec = make_environment_spec(environment)
+    # target_entropy = target_entropy_from_env_spec(env_spec)
+    # if config.entropy_coefficient is None:
+    #     config.target_entropy = target_entropy
 
     assert (environment.action_spec().minimum == -1).all()
     assert (environment.action_spec().maximum == 1).all()

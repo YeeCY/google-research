@@ -27,9 +27,9 @@ for seed in "${seeds[@]}"; do
   mkdir -p "$LOG_DIR"/"${EXP_LABEL}"/$seed
   nohup \
   python $PROJECT_DIR/lp_contrastive.py \
-    --env_name=sawyer_bin \
+    --env_name=sawyer_window \
     --alg=c_learning \
-    --max_number_of_steps=5_000_000 \
+    --max_number_of_steps=3_000_000 \
     --seed="$seed" \
     --lp_launch_type=local_mp \
     --root_dir="$LOG_DIR"/"${EXP_LABEL}"/$seed \

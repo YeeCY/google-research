@@ -342,11 +342,11 @@ class ContrastiveLearner(acme.Learner):
                 log_prob = networks.log_prob(dist_params, transitions.action)
                 actor_loss = -1.0 * jnp.mean(log_prob)
             else:
-                # state = obs[:, :config.obs_dim]
-                # goal = obs[:, config.obs_dim:]
-
                 state = obs[:, 0, :config.obs_dim]
-                goal = obs[:, 1, :config.obs_dim]
+                goal = obs[:, 1, config.obs_dim:]
+
+                # state = obs[:, 0, :config.obs_dim]
+                # goal = obs[:, 1, :config.obs_dim]
 
                 if config.random_goals == 0.0:
                     new_state = state
@@ -393,7 +393,7 @@ class ContrastiveLearner(acme.Learner):
                 # A_phi_psi
                 if len(q_action.shape) == 3:  # twin q trick
                     assert q_action.shape[-1] == 2
-                    q_action = jnp.mean(q_action, axis=-1)
+                    q_action = jnp.min(q_action, axis=-1)
                 # actor_loss = alpha * log_prob - jnp.diag(q_action)
                 # q_action = jnp.sum(q_action * action_dist, axis=-1)
                 # q_action = jnp.einsum('ij,ij->i', q_action, action)
