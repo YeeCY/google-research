@@ -14,7 +14,7 @@ export HDF5_USE_FILE_LOCKING=FALSE
 export TF_FORCE_GPU_ALLOW_GROWTH=true
 export D4RL_SUPPRESS_IMPORT_ERROR=1
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export LOG_DIR="/projects/rsalakhugroup/chongyiz/contrastive_rl_logs"
+export LOG_DIR="/projects/rsalakhugroup/chongyiz/td_infonce_vs_c_learning_logs"
 
 declare -a seeds=(0)
 
