@@ -22,6 +22,7 @@ import os
 
 import ant_env
 import fetch_envs
+import qrl_fetch_envs
 import gym
 import metaworld
 import numpy as np
@@ -94,6 +95,30 @@ def load(env_name):
         CLASS = fetch_envs.FetchPushImage
         max_episode_steps = 50
         kwargs['rand_y'] = True
+    elif env_name == 'qrl_fetch_reach':
+        CLASS = qrl_fetch_envs.FetchReachEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_push':
+        CLASS = qrl_fetch_envs.FetchPushEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_reach_image':
+        CLASS = qrl_fetch_envs.FetchReachImageEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_push_image':
+        CLASS = qrl_fetch_envs.FetchPushImageEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_slide':
+        CLASS = qrl_fetch_envs.FetchSlideEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_slide_image':
+        CLASS = qrl_fetch_envs.FetchSlideImageEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_pick_and_place':
+        CLASS = qrl_fetch_envs.FetchPickAndPlaceEnv
+        max_episode_steps = 50
+    elif env_name == 'qrl_fetch_pick_and_place_image':
+        CLASS = qrl_fetch_envs.FetchPickAndPlaceImageEnv
+        max_episode_steps = 50
     elif env_name == 'grid_world':
         CLASS = gridworld_env.GridWorldEnv
         max_episode_steps = 50

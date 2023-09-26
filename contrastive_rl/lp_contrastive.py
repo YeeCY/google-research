@@ -52,7 +52,6 @@ flags.DEFINE_integer('max_number_of_steps', 1_000_000,
                      'environment steps. For offline RL experiments, this is the number of'
                      'gradient steps.')
 flags.DEFINE_integer('seed', 0, 'Random seed')
-flags.DEFINE_float('w_clipping', 20, 'Value of w_clipping')
 flags.DEFINE_float('c_learning_prob', 0.0, 'Value to interpolate between C-Learning and SARSA Q')
 flags.DEFINE_string('trained_agent_dir', None, 'Root directory for trained agent checkpoints.')
 flags.DEFINE_bool('exp_log_dir_add_uid', False,
@@ -161,7 +160,6 @@ def main(_):
         # default max_number_of_steps = 1_000_000, 15625 for 1M gradient steps in total
         'max_number_of_steps': FLAGS.max_number_of_steps,
         'use_image_obs': 'image' in env_name,
-        'w_clipping': FLAGS.w_clipping,
         'trained_agent_dir': FLAGS.trained_agent_dir,
     }
     if 'ant_' in env_name:
