@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2022 The Google Research Authors.
+# Copyright 2023 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
 
 """Contrastive RL config."""
 import dataclasses
-from typing import Any, Optional, Union, Tuple
+from typing import Optional, Union, Tuple
 
+import numpy as onp
 from acme import specs
 from acme.adders import reverb as adders_reverb
-import numpy as onp
 
 
 @dataclasses.dataclass
@@ -46,12 +46,7 @@ class ContrastiveConfig:
     # tau: float = 0.005
     # tau: float = 0.05
     tau: float = 0.005
-    # hidden_layer_sizes: Tuple[int, ...] = (128, 256, 512, 256)
-    hidden_layer_sizes: Tuple[int, ...] = (512, 512, 512, 512)
-    # hidden_layer_sizes: Tuple[int, ...] = (256, 256)
-    # hidden_layer_sizes: Tuple[int, ...] = (1024, 1024, 1024, 1024)
-    # hidden_layer_sizes: Tuple[int, ...] = (2048, 2048, 2048, 2048)
-    # hidden_layer_sizes: Tuple[int, ...] = (4096, 4096, 4096, 4096)
+    hidden_layer_sizes: Tuple[int, Ellipsis] = (256, 256)
 
     # Replay options
     min_replay_size: int = 10000
@@ -67,34 +62,19 @@ class ContrastiveConfig:
 
     repr_dim: Union[int, str] = 64  # Size of representation.
     use_random_actor: bool = True  # Initial with uniform random policy.
-    repr_norm: bool = True
+    repr_norm: bool = False
     repr_norm_temp: float = 1.0
     use_cpc: bool = False
     local: bool = False  # Whether running locally. Disables eval.
     use_td: bool = False
-    w_clipping: float = 20.0  # (chongyiz): value of w_clipping
-    use_eq_5: bool = False  # (chongyiz): use equation (5) of C-Learning instead of equation (7)
-    negative_action_sampling: bool = False  # (chongyiz): MC with negative action sampling
-    negative_action_sampling_future_goals: bool = False  # (chongyiz): negative action sampling with future goal
-    c_learning_prob: float = 1.0  # (chongyiz): interpolate between C-learning and SARSA
-    actual_next_action: bool = False  # (chongyiz): SARSA Q estimation with actual next action
-    fitted_next_action: bool = False  # (chongyiz): SARSA Q estimation with fitted next action
-    next_action_add_gaussian_noise: bool = False  # (chongyiz): add standard gaussian noise to next action
     twin_q: bool = False
     use_gcbc: bool = False
     use_image_obs: bool = False
-    random_goals: float = 0.0
-    actor_loss_with_target_critic: bool = False
-    actor_loss_with_reverse_kl: bool = False
+    random_goals: float = 0.5
     jit: bool = True
     add_mc_to_td: bool = False
     resample_neg_actions: bool = False
     bc_coef: float = 0.0
-    reverse_kl_coef: float = 0.0
-
-    use_arbitrary_func_reg: bool = False
-    arbitrary_func_reg_coef: float = 0.005
-    # arbitrary_func_reg_coef: float = 1e-3
 
     # Parameters that should be overwritten, based on each environment.
     obs_dim: int = -1
@@ -107,9 +87,9 @@ class ContrastiveConfig:
 
 
 def target_entropy_from_env_spec(
-        spec: specs.EnvironmentSpec,
-        target_entropy_per_dimension: Optional[float] = None,
-) -> float:
+        spec,
+        target_entropy_per_dimension=None,
+):
     """A heuristic to determine a target entropy.
 
     If target_entropy_per_dimension is not specified, the target entropy is
@@ -124,7 +104,7 @@ def target_entropy_from_env_spec(
       target entropy
     """
 
-    def get_num_actions(action_spec: Any) -> float:
+    def get_num_actions(action_spec):
         """Returns a number of actions in the spec."""
         if isinstance(action_spec, specs.BoundedArray):
             return onp.prod(action_spec.shape, dtype=int)
